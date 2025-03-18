@@ -73,30 +73,43 @@ function drawContours() {
 
         if (arcData.length !== 0 && arcType === 'partial') {
             //Get center point correctly
-            let cX = arcData[0] === arcData[2] ? arcData[5] : arcData[0];
-            let cY = arcData[1] === arcData[3] ? arcData[6] : arcData[1];
             let sX = arcData[0];
             let sY = arcData[1];
-            [cX, cY] = transformCoordinates(view, cX, cY, canvasWidth, canvasHeight);
+            let cX = arcData[2];
+            let cY = arcData[3];
+            let eX = arcData[5];
+            let eY = arcData[6];
             [sX, sY] = transformCoordinates(view, sX, sY, canvasWidth, canvasHeight);
-            const isClockwise = arcData[4] > 0 ? true : false;
+            [eX, eY] = transformCoordinates(view, eX, eY, canvasWidth, canvasHeight);
+            const isClockwise = arcData[4] > 0 ? false : true;
             const r = Math.abs(arcData[4]);
         
-            //Compute start and end angles in degrees
-            let startAngle = Math.atan2(sY - cY, sX - cX) * (180 / Math.PI);
-        
+            [cX, cY] = calcCenter(sX, sY, cX, cY, eX, eY, r);
+
+            let startAngle = calcAngle(sX, sY, cX, cY);
+            let endAngle = calcAngle(eX, eY, cX, cY);
+            startAngle = transformAngle(view, startAngle);
+            endAngle = transformAngle(view, endAngle);
+
+            let arcAngle = Math.abs(startAngle - endAngle);
+            arcAngle = Math.min(arcAngle, 360 - arcAngle);
+            let rotation = transformRotation(view, isClockwise, endAngle, startAngle);
+
             let arc = new Konva.Arc({
                 x: cX,
                 y: cY,
                 innerRadius: r,
                 outerRadius: r,
-                angle: 90,
+                angle: arcAngle,
                 stroke: 'black',
-                rotation: startAngle, 
+                rotation: rotation,
                 strokeWidth: 3,
                 name: 'contour-arc',
-                clockwise: isClockwise,
+                snapPoints : [
+                    {cX, cY}
+                ],
             });
+            addSnapIndicator(cX, cY, view);
         
             arc.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
             layer.add(arc);
@@ -124,32 +137,30 @@ function drawContours() {
             const r = Math.abs(arcData[4]);
         
             //Compute start and end angles in degrees
-            let startAngle = Math.atan2(sY - cY, sX - cX) * (180 / Math.PI);
-            let endAngle = Math.atan2(eY - cY, eX - cX) * (180 / Math.PI);
-            startAngle = (startAngle + 360) % 360;
-            endAngle = (endAngle + 360) % 360;
-            let sweepAngle;
-            if (isClockwise) {
-                sweepAngle = endAngle - startAngle;
-                if (sweepAngle < 0) sweepAngle += 360; //Ensure positive sweep
-            } else {
-                sweepAngle = startAngle - endAngle;
-                if (sweepAngle < 0) sweepAngle += 360; //Ensure positive sweep
-                sweepAngle += 180; //Ensure correct sweep angle
-            }
+            let startAngle = calcAngle(sX, sY, cX, cY);
+            let endAngle = calcAngle(eX, eY, cX, cY);
+            startAngle = transformAngle(view, startAngle);
+            endAngle = transformAngle(view, endAngle);
+            
+            let arcAngle = Math.abs(startAngle - endAngle);
+            arcAngle = Math.max(arcAngle, 360 - arcAngle);
+            let rotation = transformRotation(view, isClockwise, endAngle, startAngle);
         
             let arc = new Konva.Arc({
                 x: cX,
                 y: cY,
                 innerRadius: r,
                 outerRadius: r,
-                angle: sweepAngle,
+                angle: arcAngle,
                 stroke: 'black',
-                rotation: startAngle, 
+                rotation: rotation + 90, 
                 strokeWidth: 3,
                 name: 'contour-arc',
-                clockwise: isClockwise,
+                snapPoints : [
+                    {cX, cY}
+                ],
             });
+            addSnapIndicator(cX, cY, view);
         
             arc.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
             layer.add(arc);
@@ -416,36 +427,63 @@ function drawNumertaions() {
     }
 }
 
+
 //Function to apply coordinate transformations based on view
 function transformCoordinates(view, x, y, width, height) {
     switch (view) {
-        case 'v-view': // Bottom-right, X and Y negative
-            return [ x, height - y];
-        case 'u-view': // Bottom-left, X negative only
+        case 'v-view': // Bottom-left, X and Y negative
+        case 'u-view': 
             return [x, height - y];
-        case 'h-view': // Top-right, Y negative only
-            return [x, y];
         case 'o-view': // Bottom-right, X and Y negative
             return [width - x, height - y];
+        case 'h-view': // Top-right, Y negative only
         default:
-            return [x, y]; // No transformation for unknown views
+            return [x, y];
     }
 }
 
 //Function to apply angle transformations based on view
 function transformAngle(view, angle) {
     switch (view) {
-        case 'v-view': // Bottom-right, X and Y negative
+        case 'v-view':
+        case 'u-view':
             return (360 - angle) % 360;
-        case 'u-view': // Bottom-left, X negative only
-            return (360 - angle) % 360;
-        case 'h-view': // Top-right, Y negative only
-            return angle;
-        case 'o-view': // Bottom-right, X and Y negative
+        case 'o-view':
             return (180 + angle) % 360;
+        case 'h-view':
         default:
-            return angle; // No transformation for unknown views
+            return angle;
     }
+}
+
+function transformRotation(view, isClockwise, startAngle, endAngle) {
+    switch (view) {
+        case 'o-view':
+            return isClockwise ? (startAngle + 180) % 360 : (endAngle + 180) % 360;
+        case 'v-view':
+        case 'u-view':
+            return  isClockwise ? -endAngle : -startAngle;
+        case 'h-view':
+        default:
+            return !isClockwise ? endAngle : startAngle;
+    }
+}
+
+function calcAngle(pX, pY, cX, cY){
+    let angle = Math.atan2(pY - cY, pX - cX) * (180 / Math.PI); // Negate y for mathematical orientation
+    return angle < 0 ? angle + 360 : angle; // Convert negative angles to 0-360 range
+}
+
+function calcCenter(sX, sY, cX, cY, eX, eY, r) {
+    let [mX, mY] = [(sX + eX) / 2, (sY + eY) / 2]; //Center of start and end points
+    let l = Math.sqrt(((sX - eX) ** 2) + ((sY - eY) ** 2)); //Distance between start and end points
+    //Calculate the two possible centers
+    let [solX1, solY1] = [mX + Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY + Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
+    let [solX2, solY2] = [mX - Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY - Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
+    //Find the furthest away cX, xY and that's our solution
+    let d1 =  Math.sqrt(((cX - solX1) ** 2) + ((cY - solY1) ** 2));
+    let d2 =  Math.sqrt(((cX - solX2) ** 2) + ((cY - solY2) ** 2));
+    return d1 > d2 ? [solX1, solY1]: [solX2, solY2];
 }
 
 //Draws blocs to the canves
