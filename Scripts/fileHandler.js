@@ -52,16 +52,13 @@ function selectFile(file){
     //parses file header data and add it to the view
     ncParseHeaderData(filePairs.get(file));
     ncParseBlocData(filePairs.get(file));
-    //Draw blocs to view
-    drawBlocs();
-    //Eesets scale and position of the view
-    resetScale();
-    //Shows the views image
-    ncViewsImage();
-    //Clears hole data
-    document.getElementById('holeInfoContainer').innerHTML = '';
-    //Adds hole data to hole info tap
-    addHoleData();
+    drawBlocs(); //Draw blocs to view
+    resetScale(); //Eesets scale and position of the view
+    ncViewsImage(); //Shows the views image
+    document.getElementById('holeInfoContainer').innerHTML = ''; //Clears hole data
+    addHoleData(); //Adds hole data to hole info tap
+    document.getElementById("historyDropdown").innerHTML = ''; //Delete measurement history
+    document.getElementById('historyDropdownBtn').classList.add('lighten-3'); //Fades the measurement history button
     //Closes side nav
     let sideNav = document.querySelector('.sidenav');
     let instance = M.Sidenav.getInstance(sideNav)
@@ -140,13 +137,15 @@ function deleteFile(btn, event){
     });
     //reset place holder if theres no files
     filesPlaceHolder();
-    //Clears hole data
-    document.getElementById('holeInfoContainer').innerHTML = '';
     //clears the header data and views
     if (selectedFile) {
         clearHeaderData();
         clearAllViews();
-        document.getElementById('profileViewsImg').src = '';
+        clearAllData();
+        document.getElementById('holeInfoContainer').innerHTML = ''; //Clears hole data
+        document.getElementById('profileViewsImg').src = ''; //Clears profile image
+        document.getElementById("historyDropdown").innerHTML = ''; //Delete measurement history
+        document.getElementById('historyDropdownBtn').classList.add('lighten-3'); //Fades the measurement history button
     }
 }
 
@@ -155,32 +154,29 @@ function clearAllFiles(){
     //checks if map is empty
     if (filePairs.size == 0)
     {
-        M.toast({html: 'There are no files to clear!', classes: 'rounded toast-warning', displayLength: 2000})
+        M.toast({html: 'There are no files to clear!', classes: 'rounded toast-warning', displayLength: 2000});
         return;
     }
     //removes all files from view
     document.querySelectorAll('.viewFiles').forEach(el => {
         el.remove();
     });
-    //clears map
-    filePairs.clear();
-    //shows place holder
-    filesPlaceHolder();
-    //clears the header data
-    clearHeaderData();
-    //clears the views
-    clearAllViews();
-    //Clears hole data
-    document.getElementById('holeInfoContainer').innerHTML = '';
-    //clears views img
-    document.getElementById('profileViewsImg').src = '';
-    //shows success message
-    M.toast({html: 'All files were cleared!', classes: 'rounded toast-success', displayLength: 2000})
+    filePairs.clear(); //clears map
+    filesPlaceHolder(); //shows place holder
+    clearHeaderData(); //clears the header data
+    clearAllViews(); //clears the views
+    clearAllData(); //Clears bloc data
+    document.getElementById('holeInfoContainer').innerHTML = ''; //Clears hole data
+    document.getElementById('profileViewsImg').src = ''; //clears views img
+    document.getElementById("historyDropdown").innerHTML = ''; //Delete measurement history
+    document.getElementById('historyDropdownBtn').classList.add('lighten-3'); //Fades the measurement history button
+    M.toast({html: 'All files were cleared!', classes: 'rounded toast-success', displayLength: 2000}); //shows success message
 }
 
 //clicks a hidden insert element when the list item is clicked
-function insert_file(){
+function insert_file(btn){
     document.getElementById('fileInput').click();
+    M.Tooltip.getInstance(btn).close(); //Closes the tooltip
 };
 
 function clearHeaderData() {

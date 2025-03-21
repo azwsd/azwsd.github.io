@@ -79,10 +79,10 @@ function getTransformedPosition(stage, pos) {
 }
 
 //find nearest snapping point
+let snapDistance = 10;
 function getNearestSnapPoint(pos) {
-    let snapRadius = 10;
     let closestPoint = pos;
-    let minDist = snapRadius;
+    let minDist = snapDistance;
 
     layers[activeMeasurementView].getChildren().forEach(shape => {
         if (shape.attrs.snapPoints) {
@@ -98,6 +98,33 @@ function getNearestSnapPoint(pos) {
 
     return closestPoint;
 }
+
+//Insures that the input numbers are in the correct range
+document.querySelectorAll("input[type=number]").forEach(input => {
+    input.addEventListener("input", function() {
+        let value = parseInt(this.value, 10); // Ensure value is an integer
+
+        if (isNaN(value)) {
+            this.value = this.min; // Default to min if value is invalid
+        } else if (value < this.min) {
+            this.value = this.min;
+        } else if (value > this.max) {
+            this.value = this.max;
+        }
+    });
+});
+
+//Loads default values
+document.addEventListener('DOMContentLoaded', function (){
+    document.getElementById('snapSize').value = snapSize;
+    document.getElementById('snapDistance').value = snapDistance;
+});
+
+document.getElementById("saveSettings").addEventListener("click", function() {
+    snapSize = document.getElementById("snapSize").value;
+    snapDistance = document.getElementById("snapDistance").value;
+    drawBlocs(); //Redraw views
+});
 
 // Track active measurement state
 let isMeasuring = false;
@@ -153,8 +180,6 @@ function handleMeasurementClick(stage, e) {
     }
 }
 
-
-
 //update preview measurement line
 function handleMouseMove(stage, e) {
     if (measurementPoints.length === 1 && tempLine) {
@@ -167,18 +192,20 @@ function handleMouseMove(stage, e) {
 }
 
 //measure distance between two points
+let measurementCounter = 0;
 function measureDistance(start, end, view, isRedrawing) {
-    const mLayer = measurementLayers[view]; 
+    const mLayer = measurementLayers[view];
     const distance = Math.hypot(end.x - start.x, end.y - start.y).toFixed(2);
     const hDistance = Math.abs(end.x - start.x).toFixed(2);
     const vDistance = Math.abs(end.y - start.y).toFixed(2);
 
+    measurementCounter++;
     let line = new Konva.Line({
         points: [start.x, start.y, end.x, end.y],
         stroke: 'gray',
         strokeWidth: 3,
         dash: [5, 5],
-        name: 'final-measurement-line',
+        name: `final-measurement-line-${measurementCounter}`,
         listening: false 
     });
 
@@ -187,8 +214,8 @@ function measureDistance(start, end, view, isRedrawing) {
         y: (start.y + end.y) / 2,
         text: `${distance} mm`,
         fontSize: 30,
-        fill: 'red',
-        name: 'measurement-text',
+        fill: 'green',
+        name: `measurement-text-${measurementCounter}`,
         offsetX: 20,
         offsetY: 10
     });
@@ -198,8 +225,11 @@ function measureDistance(start, end, view, isRedrawing) {
     mLayer.add(line, label);
     mLayer.batchDraw();
 
+    if (measurementCounter > 0) document.getElementById('historyDropdownBtn').classList.remove('lighten-3');
+
     //Only store new measurements, prevent duplicates on redraw
     if (!isRedrawing) {
+        addMeasurementData(measurementCounter, view, distance, hDistance, vDistance); //Adds measurement data to history menu
         storedMeasurements.push({ start, end, view });
         //Show toast message for measurement
         M.toast({ html: `length: ${distance} mm, X: ${hDistance} mm, Y: ${vDistance} mm`, classes: 'rounded toast-success', displayLength: 3000});
@@ -348,6 +378,9 @@ function clearMeasurements() {
         measurementLayers[view].batchDraw();
     }
     );
+    document.getElementById('historyDropdown').innerHTML = ''; //Clears measurement history
+    measurementCounter = 0; //Resets measuremtn counter
+    document.getElementById('historyDropdownBtn').classList.add('lighten-3');
 }
 
 let tool = 'pan'; // Default tool is panning
