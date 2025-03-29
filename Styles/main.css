@@ -29,6 +29,8 @@ html, body
 }
 
 #functionButtons {
+    position: sticky;
+    z-index: 900; /* Keep it above other elements */
     display: flex;
     flex-wrap: nowrap; /* Prevents wrapping */
     gap: 5px;
@@ -42,6 +44,9 @@ html, body
 }
 
 /* Setting items styling */
+#settingsDropdown {
+    overflow-x: hidden;
+}
 .settings-item {
     padding: 10px 16px;
     display: flex;
@@ -55,6 +60,33 @@ html, body
 }
 .dropdown-content {
     min-width: 220px;
+}
+#settingsDropdown input[type="color"] {
+    max-width: 20%;
+}
+
+/* Styling for shortcuts modal*/
+#shortcut-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#shortcut-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+#shortcut-list li:last-child {
+    border-bottom: none;
+}
+#shortcut-list b {
+    display: inline-block;
+    width: 8rem;
+    font-weight: 600;
+    color: #512DA8; /* Deep purple accent */
+}
+.view-name {
+    font-weight: bold;
+    color: #D32F2F; /* Red accent for view names */
 }
 
 /* Styling for measurement data dropdown menu*/

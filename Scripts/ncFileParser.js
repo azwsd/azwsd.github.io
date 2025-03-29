@@ -2,7 +2,7 @@
 let headerData = [];
 //Blocs
 let blocs = ['BO', 'SI', 'AK', 'IK', 'PU', 'KO', 'SC', 'TO', 'UE', 'PR', 'KA', 'EN']
-//Contour bloc data
+//External contour bloc data
 let contourData = [];
 //Hole bloc data
 let holeData = [];
@@ -12,6 +12,13 @@ let marksData = [];
 let numerationsData = [];
 //Store lastFace data
 let lastFace = "";
+//View contour bloc status
+let viewExists = {
+    o: false,
+    v: false,
+    u: false,
+    h: false
+};
 
 //Parses the header of DSTV file
 function ncParseHeaderData(fileData){
@@ -86,7 +93,7 @@ function ncViewsImage(){
 }
 
 //Parse contour blocs and add them to the contourData array
-function ncParseContourData(line){
+function ncParseContourData(line, contourType){
     let values = line.trim().split(/\s+/); // Split by whitespace
     let face = "";  
     let xValue, dimensionRef, yValue;
@@ -99,6 +106,7 @@ function ncParseContourData(line){
         face = lastFace; // Use the previous face if not present
     }
     lastFace = face; // Update last seen face
+    viewExists[face] = true; //Set the view exists for the current view as true
 
     // Extract X-value and check for dimension reference
     let xMatch = values[0].match(/([\d.]+)([A-Za-z]*)$/);
@@ -116,7 +124,7 @@ function ncParseContourData(line){
     }
 
     // Add parsed line to contourBlocks
-    contourData.push([face, xValue, dimensionRef, yValue, ...parsedValues]);
+    contourData.push([face, xValue, dimensionRef, yValue, ...parsedValues, contourType]);
 }
 
 //Parse hole blocs and add them to the holeData array
@@ -167,7 +175,6 @@ function ncParseHoleData(line) {
     holeData.push([view, xValue, dimensionRef, yValue, holeType, diameter, depth, slotType, width, height, angle]);
 }
 
-
 //Parses Blocs
 function ncParseBlocData(fileData){
     const splitFileData = fileData.split('\n'); //split file lines
@@ -192,7 +199,10 @@ function ncParseBlocData(fileData){
         }
 
         //Parse contour blocs and add them to the contourData array
-        if (bloc == 'AK' || bloc == 'IK') ncParseContourData(line);
+        if (bloc == 'AK' || bloc == 'IK') {
+            isStart = false;
+            ncParseContourData(line, bloc);
+        }
         //Parse hole blocs and add them to the holeData array
         if (bloc == 'BO') ncParseHoleData(line);
         //Parse marks blocs and add them to the marksData array
@@ -204,7 +214,7 @@ function ncParseBlocData(fileData){
         if (bloc == 'SI') ncParseNumertaionsData(line);
     }
 
-    if (contourData.length == 0) ncHeaderFullyDefined();
+    handleUndefinedViews();
 }
 
 //Empties stored bloc data
@@ -214,6 +224,12 @@ function clearAllData() {
     marksData.length = 0;
     numerationsData.length = 0;
     storedMeasurements.length = 0;
+    viewExists = {
+        o: false,
+        v: false,
+        u: false,
+        h: false
+    };
 }
 
 //Parse Marks
@@ -400,6 +416,7 @@ function deleteMeasurement(btn, event) {
     let layer = measurementLayers[view];
     layer.findOne(`.final-measurement-line-${measurementCounter}`).destroy(); //Find the measurement line by its name
     layer.findOne(`.measurement-text-${measurementCounter}`).destroy(); //Find the measurement text by its name
+    layer.findOne(`.measurement-transformer-${measurementCounter}`).destroy(); //Find the measurement text transformer by its name
     layer.batchDraw(); //Redraws the layer after modification
     div.remove(); //Removes measurement history from dropdown menu
     instance.recalculateDimensions(); //Recalculates drodown dimensions when elements are removed
@@ -430,7 +447,7 @@ function changeMeasurementColor(measurementDiv) {
 }
 
 //Hnadles if there are no countour blocs and the part is defined by header only
-function ncHeaderFullyDefined(){
+function handleUndefinedViews(){
     const profile = document.getElementById('Code').querySelector('p:first-of-type').innerHTML.trim();
     const length = parseFloat(document.getElementById('Length').querySelector('p:first-of-type').innerHTML);
     const height = parseFloat(document.getElementById('Height').querySelector('p:first-of-type').innerHTML);
@@ -449,29 +466,30 @@ function ncHeaderFullyDefined(){
    if (['U', 'B', 'L', 'C', 'M'].includes(profile)) {
         switch (profile) {
             case 'M':
-                addBackWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+                if (!viewExists.h) addBackWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             case 'U':
             case 'C':
-                addTopFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+                if (!viewExists.o) addTopFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             case 'L':
-                addBottomFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+                if (!viewExists.u) addBottomFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             case 'B':
-                addFrontWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+                if (!viewExists.v) addFrontWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             default:
                 break;
         }
     }
     else if (profile == 'I')
     {
-        addTopFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
-        addBottomFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
-        addFrontWebI(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+        if (!viewExists.o) addTopFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+        if (!viewExists.u) addBottomFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+        if (!viewExists.v) addFrontWebI(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
     }
     else if (profile == 'T')
     {
-        addT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+        if (!viewExists.h) addFlangeT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+        if (!viewExists.u) addWebT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
     }
-    else M.toast({html: 'Profile type not supported!', classes: 'rounded toast-error', displayLength: 2000});
+    else if(!(viewExists.o && viewExists.v && viewExists.u && viewExists.h)) M.toast({html: `Profile ${profile} not supported!`, classes: 'rounded toast-error', displayLength: 2000}); //Handles if there are not contour data and profile is not supported
     return;
 }
 
@@ -611,19 +629,15 @@ function addBottomFlange(length, height, flangeWidth, flangeThickness, webThickn
     contourData.push(firstPoint);
 }
 
-function addT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE) {
+function addFlangeT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE) {
     const wCS = (height - flangeThickness) * Math.tan((webCutStart * Math.PI) / 180);
     const wCE = (height - flangeThickness) * Math.tan((webCutEnd * Math.PI) / 180);
-    const wCST = ((height - flangeThickness)/2) * Math.tan((webCutStart * Math.PI) / 180);
-    const wCET = ((height - flangeThickness)/2) * Math.tan((webCutEnd * Math.PI) / 180);
     const fCS = (flangeWidth - webThickness) * Math.tan((flangeCutStart * Math.PI) / 180);
     const fCE = (flangeWidth - webThickness) * Math.tan((flangeCutEnd * Math.PI) / 180);
     let firstPoint = [];
 
     const sValue = wCS > fCS ? wCS : fCS;
     const eValue = wCE > fCE ? wCE : fCE;
-    const sValueT = wCST > fCS ? wCST : fCS;
-    const eValueT = wCET > fCE ? wCET : fCE;
     //Calculate web points
     if (!isNegativeWCS && !isNegativeFCS) firstPoint = ['h', fCS, '', 0.00, '', 0.00, 0.00, 0.00, 0.00, 0.00];
     else if (!isNegativeWCS && isNegativeFCS) firstPoint = ['h', 0.00, '', 0.00, '', 0.00, 0.00, 0.00, 0.00, 0.00];
@@ -647,6 +661,17 @@ function addT(length, height, flangeWidth, flangeThickness, webThickness, webCut
     else contourData.push(['h', 0.00, '', height, '', 0.00, 0.00, 0.00, 0.00, 0.00]);
 
     contourData.push(firstPoint);
+}
+
+function addWebT(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE) {
+    const wCST = ((height - flangeThickness)/2) * Math.tan((webCutStart * Math.PI) / 180);
+    const wCET = ((height - flangeThickness)/2) * Math.tan((webCutEnd * Math.PI) / 180);
+    const fCS = (flangeWidth - webThickness) * Math.tan((flangeCutStart * Math.PI) / 180);
+    const fCE = (flangeWidth - webThickness) * Math.tan((flangeCutEnd * Math.PI) / 180);
+    let firstPoint = [];
+
+    const sValueT = wCST > fCS ? wCST : fCS;
+    const eValueT = wCET > fCE ? wCET : fCE;
     //Calculate flange points
     if (!isNegativeWCS && !isNegativeFCS) firstPoint = ['u', wCST, '', 0.00, '', 0.00, 0.00, 0.00, 0.00, 0.00];
     else if (!isNegativeWCS && isNegativeFCS) firstPoint = ['u', sValueT, '', 0.00, '', 0.00, 0.00, 0.00, 0.00, 0.00];

@@ -16,9 +16,6 @@ function handleResize(view) {
     if (stage && container) {
         stage.width(container.clientWidth);
         stage.height(container.clientHeight);
-        //Redraw blocks and measurements for the specific view
-        drawBlocs();
-        redrawMeasurements();
     }
 }
 
@@ -115,25 +112,97 @@ document.querySelectorAll("input[type=number]").forEach(input => {
 });
 
 //Loads default values
+let snapDistanceMin = 1;
+let snapDistanceMax = 20;
+let snapSizeMin = 1;
+let snapSizeMax = 20;
 document.addEventListener('DOMContentLoaded', function (){
     //Set values in the settings dropdown menu to default
-    document.getElementById('snapSize').value = snapSize;
-    document.getElementById('snapDistance').value = snapDistance;
+    let snapSizeElement = document.getElementById('snapSize');
+    snapSizeElement.value = snapSize;
+    snapSizeElement.min = snapSizeMin;
+    snapSizeElement.max = snapSizeMax;
+    let snapDistanceElement = document.getElementById('snapDistance');
+    snapDistanceElement.value = snapDistance;
+    snapDistanceElement.min = snapDistanceMin;
+    snapDistanceElement.max = snapDistanceMax;
     document.getElementById('snapPointColor').value = snapPointColor;
     document.getElementById('originPointColor').value = originPointColor;
     document.getElementById('measurementColor').value = measurementColor;
     document.getElementById('measurementTextColor').value = measurementTextColor;
+    document.getElementById('measurementTextTransform').checked = resizeVisable;
 });
 
 document.getElementById("saveSettings").addEventListener("click", function() {
     //Set values in script to values from settings dropdown menu
     snapSize = document.getElementById("snapSize").value;
+    //Ensure snap size is in range
+    if(snapSize < snapSizeMin) {
+        document.getElementById("snapSize").value = snapSizeMin;
+        snapSize = snapSizeMin;
+    }
+    else if(snapSize > snapSizeMax) {
+        document.getElementById("snapSize").value = snapSizeMax;
+        snapSize = snapSizeMax;
+    }
     snapDistance = document.getElementById("snapDistance").value;
+    if(snapDistance < snapDistanceMin) {
+        document.getElementById("snapDistance").value = snapDistanceMin;
+        snapDistance = snapDistanceMin;
+    }
+    else if(snapDistance > snapDistanceMax) {
+        document.getElementById("snapDistance").value = snapDistanceMax;
+        snapDistance = ssnapDistanceMax;
+    }
     snapPointColor = document.getElementById('snapPointColor').value;
     originPointColor = document.getElementById('originPointColor').value;
     measurementColor = document.getElementById('measurementColor').value;
     measurementTextColor = document.getElementById('measurementTextColor').value;
-    drawBlocs(); //Redraw views
+    resizeVisable = document.getElementById('measurementTextTransform').checked;
+
+    //Iterate over all measurement layers
+    Object.values(measurementLayers).forEach(layer => {
+        layer.getChildren(node => 
+            node.name()?.startsWith("final-measurement-line") ||
+            node.name()?.startsWith("measurement-text")
+        ).forEach(node => {
+            if (node.className === "Line") node.stroke(measurementColor); //Change Line color
+            else if (node.className === "Text") {
+                node.fill(measurementTextColor); //Change text color
+                node.draggable(resizeVisable); //Change draggable status
+            }
+        });
+
+        //Iterate over all transformer for measuring lables
+        const labelTransformers = layer.find('Transformer');
+        labelTransformers.forEach(labelTransformer => {
+            resizeVisable == false ? labelTransformer.hide() : labelTransformer.show();
+        });
+
+        layer.batchDraw(); //Redraw layer after updates
+    });
+
+    //Iterate over all snap layers
+    Object.values(snapLayers).forEach(layer => {
+        layer.getChildren(node => node.name() === "origin-point").forEach(node => {
+            if (node.className === "Circle") {
+                node.fill(originPointColor); //Change origin point color
+                node.radius(snapSize); //Change size
+            }
+        });
+
+        layer.batchDraw(); //Redraw layer after updates
+    });
+    Object.values(snapLayers).forEach(layer => {
+        layer.getChildren(node => node.name() === "snap-indicator").forEach(node => {
+            if (node.className === "Circle") {
+                node.fill(snapPointColor); //Change snap point color
+                node.radius(snapSize); //Change size
+            }
+        });
+
+        layer.batchDraw(); //Redraw layer after updates
+    });
 });
 
 //Track active measurement state
@@ -204,6 +273,7 @@ function handleMouseMove(stage, e) {
 //measure distance between two points
 let measurementColor = '#808080';
 let measurementTextColor = '#008000';
+let resizeVisable = false;
 let measurementCounter = 0;
 function measureDistance(start, end, view, isRedrawing, index) {
     const mLayer = measurementLayers[view];
@@ -223,6 +293,11 @@ function measureDistance(start, end, view, isRedrawing, index) {
         listening: false 
     });
 
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const angleRad = Math.atan2(dy, dx);
+    const angleDeg = angleRad * (180 / Math.PI);
+
     let labelName = isRedrawing ? `measurement-text-${index}` : `measurement-text-${measurementCounter}`;
     let label = new Konva.Text({
         x: (start.x + end.x) / 2,
@@ -231,13 +306,22 @@ function measureDistance(start, end, view, isRedrawing, index) {
         fontSize: 30,
         fill: measurementTextColor,
         name: labelName,
-        offsetX: 20,
-        offsetY: 10
+        draggable: resizeVisable,
+        rotation: angleDeg
     });
+
+    let labelTransformerName = isRedrawing ? `measurement-transformer-${index}` : `measurement-transformer-${measurementCounter}`;
+    let labelTransformer = new Konva.Transformer({
+        nodes: [label],
+        name: labelTransformerName,
+        rotateEnabled: true, //allows rotation
+        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], //anchors for scaling, if desired
+    });
+    resizeVisable == false ? labelTransformer.hide() : labelTransformer.show();
 
     line.strokeScaleEnabled(false);
     label.perfectDrawEnabled(false);
-    mLayer.add(line, label);
+    mLayer.add(line, label, labelTransformer);
     mLayer.batchDraw();
 
     if (measurementCounter > 0) document.getElementById('historyDropdownBtn').classList.remove('lighten-3'); //Make measurement history button active
