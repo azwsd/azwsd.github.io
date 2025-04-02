@@ -35,17 +35,36 @@ window.addEventListener("scroll", function () {
 document.addEventListener('keydown', function (e) {
     if (e.ctrlKey && e.key === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
+        
+        let zip = new JSZip(); //Create a new ZIP archive
+        let promises = [];
+
         Object.keys(stages).forEach(view => {
-            if(document.getElementById(view).classList.contains('hide')) return; //If view is hidden skip it
-            let stage = stages[view];
-            let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High resolution export
+            if (document.getElementById(view).classList.contains('hide')) return; //Skip hidden views
             
-            let link = document.createElement('a');
-            link.href = dataURL;
-            link.download = `${view}.png`; //Name based on view name
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            let stage = stages[view];
+            let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High-resolution export
+            
+            // Convert dataURL to Blob
+            let promise = fetch(dataURL)
+                .then(res => res.blob())
+                .then(blob => {
+                    zip.file(`${view}.png`, blob); // Add PNG file to ZIP
+                });
+
+            promises.push(promise);
+        });
+
+        // Wait for all PNGs to be added, then generate the ZIP
+        Promise.all(promises).then(() => {
+            zip.generateAsync({ type: 'blob' }).then(blob => {
+                let link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = "views.zip"; // Name of the ZIP file
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
         });
     }
     else if(e.key === 's') { //Detect S
@@ -107,18 +126,22 @@ document.addEventListener('keydown', function (e) {
         else if(holeElements.length != 0) holeElements[0].click(); //If no hole is selected select first hole
     }
     else if(e.key === 'Home') {
+        e.preventDefault(); //Prevent default browser save behavior
         document.getElementById('snapSize').stepUp();
         document.getElementById('saveSettings').click();
     }
     else if(e.key === 'End') {
+        e.preventDefault(); //Prevent default browser save behavior
         document.getElementById('snapSize').stepDown();
         document.getElementById('saveSettings').click();
     }
     else if(e.key === 'PageUp') {
+        e.preventDefault(); //Prevent default browser save behavior
         document.getElementById('snapDistance').stepUp();
         document.getElementById('saveSettings').click();
     }
     else if(e.key === 'PageDown') {
+        e.preventDefault(); //Prevent default browser save behavior
         document.getElementById('snapDistance').stepDown();
         document.getElementById('saveSettings').click();
     }
@@ -139,4 +162,20 @@ document.addEventListener('keydown', function (e) {
     if(e.key.toLowerCase() === 'v') document.querySelector(`.viewSwitch[data-view="v"]`).click();
     if(e.key.toLowerCase() === 'u') document.querySelector(`.viewSwitch[data-view="u"]`).click();
     if(e.key.toLowerCase() === 'h') document.querySelector(`.viewSwitch[data-view="h"]`).click();
+});
+
+function loadProfilesPage(){
+    sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
+    sessionStorage.setItem("selectedFile", selectedFile);
+    window.location.href = "profiles.html";
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    if (filePairs != {}) {
+        for (let [fileName, fileData] of filePairs) addFile(fileName, fileData, filePairs.size, true); //Load saved files in session
+    }
+    if (selectedFile != '') {
+        selectedFile = sessionStorage.getItem('selectedFile');
+        selectFile(selectedFile); //Select saved selectedFile in session
+    }
 });
