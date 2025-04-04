@@ -31,12 +31,8 @@ window.addEventListener("scroll", function () {
     buttonContainer.style.top = navHeight + "px";
 });
 
-//Download all views when ctrl + s is pressed
-document.addEventListener('keydown', function (e) {
-    if (e.ctrlKey && e.key === 's') { //Detect Ctrl + S
-        e.preventDefault(); //Prevent default browser save behavior
-        
-        let zip = new JSZip(); //Create a new ZIP archive
+function downloadActiveViews() {
+    let zip = new JSZip(); //Create a new ZIP archive
         let promises = [];
 
         Object.keys(stages).forEach(view => {
@@ -55,17 +51,25 @@ document.addEventListener('keydown', function (e) {
             promises.push(promise);
         });
 
-        // Wait for all PNGs to be added, then generate the ZIP
-        Promise.all(promises).then(() => {
-            zip.generateAsync({ type: 'blob' }).then(blob => {
-                let link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = "views.zip"; // Name of the ZIP file
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
+    // Wait for all PNGs to be added, then generate the ZIP
+    Promise.all(promises).then(() => {
+        zip.generateAsync({ type: 'blob' }).then(blob => {
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "views.zip"; // Name of the ZIP file
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         });
+    });
+    M.Sidenav.getInstance(document.getElementById('mobile')).close(); //Closes side nav
+}
+
+//Download all views when ctrl + s is pressed
+document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.key === 's') { //Detect Ctrl + S
+        e.preventDefault(); //Prevent default browser save behavior
+        downloadActiveViews();
     }
     else if(e.key === 's') { //Detect S
         e.preventDefault(); //Prevent default browser save behavior
@@ -152,7 +156,7 @@ document.addEventListener('keydown', function (e) {
     if(e.key.toLowerCase() === 'p') activatePanTool();
     if(e.key.toLowerCase() === 'm') activateMeasureTool();
     if(e.key.toLowerCase() === 't') toggleSnapIndicators()
-    if(e.key.toLowerCase() === 'c') M.Modal.getInstance(document.getElementById('clearMeasurementsModal')).open();
+    if(e.key.toLowerCase() === 'c' && !e.ctrlKey) M.Modal.getInstance(document.getElementById('clearMeasurementsModal')).open();
     if(e.key.toLowerCase() === 'f') {
         document.getElementById('measurementTextTransform').click();
         document.getElementById('saveSettings').click();
