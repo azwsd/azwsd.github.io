@@ -65,6 +65,11 @@ function downloadActiveViews() {
     M.Sidenav.getInstance(document.getElementById('mobile')).close(); //Closes side nav
 }
 
+function clickHoleData() {
+    let btn = document.querySelector('#properties .tabs > li:nth-child(2) a');
+    if(!btn.classList.contains('active')) btn.click();
+}
+
 //Download all views when ctrl + s is pressed
 document.addEventListener('keydown', function (e) {
     if (e.ctrlKey && e.key === 's') { //Detect Ctrl + S
@@ -110,6 +115,7 @@ document.addEventListener('keydown', function (e) {
         let holeElements = document.querySelectorAll('.holeCard');
         let selectedIndex = -1;
     
+        clickHoleData()
         holeElements.forEach((el, index) => {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
@@ -122,6 +128,7 @@ document.addEventListener('keydown', function (e) {
         let holeElements = document.querySelectorAll('.holeCard');
         let selectedIndex = -1;
     
+        clickHoleData()
         holeElements.forEach((el, index) => {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
@@ -172,6 +179,12 @@ function loadProfilesPage(){
     sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
     sessionStorage.setItem("selectedFile", selectedFile);
     window.location.href = "profiles.html";
+}
+
+function loadNestingPage(){
+    sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
+    sessionStorage.setItem("selectedFile", selectedFile);
+    window.location.href = "nesting.html";
 }
 
 document.addEventListener('DOMContentLoaded', function(){

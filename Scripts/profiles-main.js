@@ -150,7 +150,10 @@ function deleteFile(btn, event){
     //clears the header data and views
     if (selectedFileDiv) {
         clearHeaderData();
-        document.getElementById('holeInfoContainer').innerHTML = ''; //Clears hole data
+        document.getElementById('profileData').innerHTML = 'please select a profile and a size!'; //Clears profile data
+        document.getElementById('Length').value = ''; //Clears length input
+        document.getElementById('Quantity').value = ''; //Clears quantity input
+        document.querySelector('#profileImage img').src = 'Images/Profiles/no-profile.png'; //Clears profile image
         document.getElementById('profileViewsImg').src = ''; //Clears profile image
         selectedFile = '';
     }
@@ -173,9 +176,12 @@ function clearAllFiles(){
     selectedFile = ''; //Clears stored selected file
     filesPlaceHolder(); //shows place holder
     clearHeaderData(); //clears the header data
-    document.getElementById('holeInfoContainer').innerHTML = ''; //Clears hole data
+    document.getElementById('profileData').innerHTML = 'please select a profile and a size!'; //Clears profile data
+    document.getElementById('Length').value = ''; //Clears length input
+    document.getElementById('Quantity').value = ''; //Clears quantity input
+    document.querySelector('#profileImage img').src = 'Images/Profiles/no-profile.png'; //Clears profile image
     document.getElementById('profileViewsImg').src = ''; //clears views img
-    updateSessionData()
+    updateSessionData();
     M.toast({html: 'All files were cleared!', classes: 'rounded toast-success', displayLength: 2000}); //shows success message
 }
 
@@ -299,6 +305,12 @@ function loadIndexPage(){
     sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
     sessionStorage.setItem("selectedFile", selectedFile);
     window.location.href = "index.html";
+}
+
+function loadNestingPage(){
+    sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
+    sessionStorage.setItem("selectedFile", selectedFile);
+    window.location.href = "nesting.html";
 }
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -509,3 +521,28 @@ function calcWeight() {
     }
     M.toast({html: `Weight: ${weight} Kg`, classes: 'rounded toast-success', displayLength: 2000});
 }
+
+document.addEventListener('keydown', function (e) {
+    if(e.key === 'ArrowUp') { //Detect arrow up
+        e.preventDefault(); //Prevent default browser save behavior
+        let fileElements = document.querySelectorAll('.viewFiles');
+        let selectedIndex = -1;
+    
+        fileElements.forEach((el, index) => {
+            if (el.classList.contains('selected-file')) selectedIndex = index;
+        });
+        // Select next file if available
+        if (selectedIndex !== -1 && selectedIndex - 1 > -1) fileElements[selectedIndex - 1].click();
+    }
+    else if(e.key === 'ArrowDown') { //Detect arrow down
+        e.preventDefault(); //Prevent default browser save behavior
+        let fileElements = document.querySelectorAll('.viewFiles');
+        let selectedIndex = -1;
+    
+        fileElements.forEach((el, index) => {
+            if (el.classList.contains('selected-file')) selectedIndex = index;
+        });
+        // Select next file if available
+        if (selectedIndex !== -1 && selectedIndex + 1 < fileElements.length) fileElements[selectedIndex + 1].click();
+    }
+});

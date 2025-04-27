@@ -1,7 +1,5 @@
-
 async function findProfile() {
     const quantity = Number(headerData[5]);
-    const profileName = headerData[6].toUpperCase().replace(/ /g,''); 
     const profileType = headerData[7].toUpperCase();
     const length = headerData[8];
     const height = headerData[9];
@@ -11,7 +9,6 @@ async function findProfile() {
     const radius = headerData[13];
     //Handle missing profile data in database
     let profileFound = false;
-    let fetchPromises = [];
 
     if (!(['I', 'U', 'L', 'M', 'RO', 'RU', 'C'].includes(profileType))) {
         M.toast({html: 'Profile not supported!', classes: 'rounded toast-error', displayLength: 2000});
@@ -22,19 +19,17 @@ async function findProfile() {
     //Convert DSTV profile type to standard type
     if (profileType == 'I' || profileType == 'U' || profileType == 'C') {
         csvPath = profileType == 'I' ? 'data/I.csv' : 'data/U.csv';
-        fetchPromises.push(fetch(csvPath)
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async obj => {
+
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile(csvPath);
+            parseCSV(csvText).forEach(async obj => {
                 if (
-                    (obj.name.toUpperCase().replace(/ /g,'') == profileName) ||
-                    (obj.alt != '' && obj.alt.toUpperCase().replace(/ /g,'') == profileName) ||
-                    (parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2) 
-                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2) 
-                    && parseFloat(obj.tw).toFixed(2) == parseFloat(webThickness).toFixed(2) 
-                    && parseFloat(obj.tf).toFixed(2) == parseFloat(flangeThickness).toFixed(2) 
-                    && parseFloat(obj.r).toFixed(2) == parseFloat(radius).toFixed(2))) {
+                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2)
+                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2)
+                    && parseFloat(obj.tw).toFixed(2) == parseFloat(webThickness).toFixed(2)
+                    && parseFloat(obj.tf).toFixed(2) == parseFloat(flangeThickness).toFixed(2)
+                    && parseFloat(obj.r).toFixed(2) == parseFloat(radius).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
                     await new Promise(resolve => {
@@ -49,18 +44,18 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[Number(obj.localIndex)].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
     if (profileType == 'L') {
-        fetchPromises.push(fetch('data/L.csv')
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async obj => {
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile('data/L.csv');
+            parseCSV(csvText).forEach(async obj => {
                 if (
-                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2) 
-                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2) 
+                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2)
+                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2)
                     && parseFloat(obj.thk).toFixed(2) == parseFloat(flangeThickness).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
@@ -76,18 +71,18 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[Number(obj.localIndex)].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
     else if (profileType == 'M' && height == flangeWidth) {
         profileType = 'SHS';
-        fetchPromises.push(fetch('data/SHS.csv')
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async (obj, index) => {
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile('data/SHS.csv');
+            parseCSV(csvText).forEach(async (obj, index) => {
                 if (
-                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2) 
+                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2)
                     && parseFloat(obj.thk).toFixed(2) == parseFloat(flangeThickness).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
@@ -103,19 +98,19 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[index].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
     else if (profileType == 'M' && height != flangeWidth) {
         profileType = 'RHS';
-        fetchPromises.push(fetch('data/RHS.csv')
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async (obj, index) => {
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile('data/RHS.csv');
+            parseCSV(csvText).forEach(async (obj, index) => {
                 if (
-                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2) 
-                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2) 
+                    parseFloat(obj.h).toFixed(2) == parseFloat(height).toFixed(2)
+                    && parseFloat(obj.b).toFixed(2) == parseFloat(flangeWidth).toFixed(2)
                     && parseFloat(obj.thk).toFixed(2) == parseFloat(flangeThickness).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
@@ -131,18 +126,18 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[index].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
     else if (profileType == 'RO') {
         profileType = 'CHS';
-        fetchPromises.push(fetch('data/CHS.csv')
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async (obj, index) => {
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile('data/CHS.csv');
+            parseCSV(csvText).forEach(async (obj, index) => {
                 if (
-                    parseFloat(obj.od).toFixed(2) == parseFloat(flangeWidth).toFixed(2) 
+                    parseFloat(obj.od).toFixed(2) == parseFloat(flangeWidth).toFixed(2)
                     && parseFloat(obj.thk).toFixed(2) == parseFloat(flangeThickness).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
@@ -158,16 +153,16 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[index].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
     else if (profileType == 'RU') {
         profileType = 'Round';
-        fetchPromises.push(fetch('data/round.csv')
-        .then(response => response.text())
-        .then(text => {
-            const csv = parseCSV(text);
-            const promises = csv.map(async (obj, index) => {
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile('data/round.csv');
+            parseCSV(csvText).forEach(async (obj, index) => {
                 if (parseFloat(obj.od).toFixed(2) == parseFloat(flangeWidth).toFixed(2)) {
                     profileFound = true;
                     await loadSubProfiles(obj.profileCode);
@@ -183,9 +178,11 @@ async function findProfile() {
                     document.querySelectorAll('#profileSizeDropdown a')[index].click();
                 }
             });
-            return Promise.all(promises);
-        }));
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+        }
     }
+
     // Wait for all fetch operations to complete
     await Promise.all(fetchPromises);
     if (!profileFound) {
@@ -196,7 +193,6 @@ async function findProfile() {
         document.getElementById('Quantity').value = quantity; //Set quantity value to quantity of DSTV part
     }
 }
-
 
 let csvData = [];
 let csvPath = '';
@@ -210,7 +206,7 @@ function loadSubProfiles(btn) {
             instance.close();
         }
         else var profile = btn;
-        
+
         const img = document.querySelector('#profileImage img');
         //If a new profile type is selected it removes profile data content
         if (loadedProfileCode != profile) {
@@ -276,22 +272,28 @@ function loadSubProfiles(btn) {
             img.src = 'Images/Profiles/no-profile.png';
             document.getElementById('profileSizeDropdown').innerHTML = '<a class="deep-purple-text lighten-3">Please select a profile!</a>';
             document.getElementById('profileData').innerHTML = 'please select a profile and a size!';
+            resolve();
             return;
         }
-        fetch(csvPath)
-            .then(response => response.text())
-            .then(text => {
-                csvData = parseCSV(text).filter(row => row.profileCode == profile);
-    
-                const profileSizeDropdown = document.getElementById('profileSizeDropdown');
-                profileSizeDropdown.innerHTML = ""; //Clear profile size dropdown
-                csvData.forEach((obj, index) => {
-                    const item = document.createElement('li');
-                    const profileID = getProfileID(obj);
-                    item.innerHTML = `<a class="deep-purple-text lighten-3" data-index="${index}" onclick="loadProfile(this)">${profileID}</a>`;
-                    profileSizeDropdown.appendChild(item);
-                });
+
+        try {
+            // Use AndroidBridge instead of fetch
+            const csvText = window.AndroidBridge.readCsvFile(csvPath);
+            csvData = parseCSV(csvText).filter(row => row.profileCode == profile);
+
+            const profileSizeDropdown = document.getElementById('profileSizeDropdown');
+            profileSizeDropdown.innerHTML = ""; //Clear profile size dropdown
+            csvData.forEach((obj, index) => {
+                const item = document.createElement('li');
+                const profileID = getProfileID(obj);
+                item.innerHTML = `<a class="deep-purple-text lighten-3" data-index="${index}" onclick="loadProfile(this)">${profileID}</a>`;
+                profileSizeDropdown.appendChild(item);
             });
-        resolve();
-    })
+            resolve();
+        } catch (error) {
+            console.error("Error loading CSV:", error);
+            M.toast({html: 'Error loading profile data!', classes: 'rounded toast-error', displayLength: 2000});
+            resolve();
+        }
+    });
 }
