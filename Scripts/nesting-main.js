@@ -1435,8 +1435,39 @@ function renderCuttingNests(nests) {
     
     tabContentContainer.appendChild(remainingPiecesTabContent);
     
+    // Add PDF export button with custom checkbox (no Materialize styling)
+    const exportButtonContainer = createElem('div', 'export-button-container center-align');
+
+    // Create a standard export button
+    const exportButton = createElem('a', 'waves-effect waves-light btn-large deep-purple');
+    exportButton.innerHTML = '<i class="material-icons left">file_download</i>Export to PDF';
+    exportButton.onclick = () => generatePDF(nests, allUsed, remaining);
+
+    // Create a custom checkbox container that won't be affected by Materialize
+    const checkboxContainer = createElem('div', 'custom-checkbox-container');
+
+    // Create a standard HTML checkbox (not using Materialize's styling)
+    const checkboxInput = document.createElement('input');
+    checkboxInput.type = 'checkbox';
+    checkboxInput.id = 'export-option';
+
+    // Create a label for the checkbox
+    const checkboxLabel = document.createElement('label');
+    checkboxLabel.htmlFor = 'export-option';
+    checkboxLabel.textContent = 'Remove nesting color';
+
+    // Assemble the checkbox and label
+    checkboxContainer.appendChild(checkboxInput);
+    checkboxContainer.appendChild(checkboxLabel);
+
+    // Add elements to the container
+    exportButtonContainer.appendChild(checkboxContainer);
+    exportButtonContainer.appendChild(document.createElement('br')); // Add spacing
+    exportButtonContainer.appendChild(exportButton);
+    
     // Append all to fragment
     fragment.appendChild(tabsContainer);
+    fragment.appendChild(exportButtonContainer);
     
     // Append fragment to container
     cuttingNestsDiv.appendChild(fragment);
@@ -1445,3 +1476,260 @@ function renderCuttingNests(nests) {
     M.Tabs.init(document.getElementById('nesting-tabs'), {});
     M.Tooltip.init(document.querySelectorAll('.tooltipped'), {});
 }
+
+// Function to generate PDF from the nesting data
+function generatePDF(nests, allUsed, remaining) {
+    // Get the jsPDF constructor from the window.jspdf object
+    const { jsPDF } = window.jspdf;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.text('Nesting Report', margin, margin + 10);
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, margin + 20);
+    doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
+    
+    let yPosition = margin + 35;
+    
+    // Add summary section
+    doc.setFontSize(16);
+    doc.text('Nesting Summary', margin, yPosition);
+    yPosition += 10;
+    
+    // Summary table
+    doc.setFontSize(10);
+    const summaryHeaders = ['Nest #', 'Profile', 'Stock Length', 'Nested Pieces', 'Offcut', 'Waste'];
+    const summaryData = nests.map((pat, i) => [
+      `${i + 1}`,
+      pat.profile,
+      `${pat.stockLength} mm`,
+      pat.pieceAssignments.length.toString(),  // Convert to string
+      `${Math.round(pat.offcut)} mm`,
+      `${Math.round(pat.waste)} mm`
+    ]);
+    
+    // Create summary table
+    doc.autoTable({
+      head: [summaryHeaders],
+      body: summaryData,
+      startY: yPosition,
+      margin: { left: margin, right: margin },
+      tableWidth: contentWidth
+    });
+    
+    yPosition = doc.lastAutoTable.finalY + 15;
+    
+    // Add a new page for nests
+    doc.addPage();
+    yPosition = margin + 10;
+    
+    // Add each nest visualization
+    nests.forEach((pat, idx) => {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 70) {
+        doc.addPage();
+        yPosition = margin + 10;
+      }
+      
+      // Add nest title
+      doc.setFontSize(14);
+      doc.text(`Nest #${idx + 1} - Profile: ${pat.profile}`, margin, yPosition);
+      yPosition += 8;
+      
+      // Add nest stats
+      doc.setFontSize(10);
+      doc.text(`Stock: ${pat.stockLength} mm | Offcut: ${Math.round(pat.offcut)} mm | Waste: ${Math.round(pat.waste)} mm | Nested Pieces: ${pat.pieceAssignments.length}`, margin, yPosition);
+      yPosition += 10;
+      
+      // Draw nest visualization
+      const barHeight = 10;
+      const barY = yPosition;
+      isBlackAndWhite = document.getElementById('export-option').checked;
+
+      // Draw stock bar
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(224, 224, 224);
+      doc.rect(margin, barY, contentWidth, barHeight, 'F');
+      
+      // Track position for pieces and saw cuts
+      let cursor = margin;
+      const scale = contentWidth / pat.stockLength;
+      
+      // Add grip start if present
+      if (pat.gripStart > 0) {
+        const gripWidth = pat.gripStart * scale;
+        doc.setFillColor(158, 158, 158);
+        doc.rect(cursor, barY, gripWidth, barHeight, 'F');
+        cursor += gripWidth;
+      }
+      
+      // Add pieces and saw cuts
+      pat.pieceAssignments.forEach((assign, i) => {
+        // Draw piece
+        const pieceWidth = assign.piece.length * scale;
+        
+        // Convert hex color to RGB for PDF
+        let color = assign.piece.color;
+        if (isBlackAndWhite) {
+            doc.setFillColor(255, 255, 255); // White for B/W
+            doc.setDrawColor(0, 0, 0); // Set stroke color (e.g., black)
+            doc.setLineWidth(0.5); // Set stroke width (e.g., 0.5 units)
+        }
+        else {
+            const r = parseInt(color.substr(1, 2), 16);
+            const g = parseInt(color.substr(3, 2), 16);
+            const b = parseInt(color.substr(5, 2), 16);
+            doc.setFillColor(r, g, b);
+        }
+        
+        doc.rect(cursor, barY, pieceWidth, barHeight, 'FD');
+        
+        // Add piece label if enough space
+        if (pieceWidth > 15) {
+            isBlackAndWhite ? doc.setTextColor(0, 0, 0) : doc.setTextColor(255, 255, 255); // Black text for B/W
+            // Make sure label is a string
+            const label = typeof assign.piece.label === 'string' ? assign.piece.label : String(assign.piece.label);
+            doc.text(label, cursor + pieceWidth / 2, barY + barHeight / 2, {
+                align: 'center',
+                baseline: 'middle'
+            });
+            doc.setTextColor(0, 0, 0); // Reset text color
+        }
+        
+        cursor += pieceWidth;
+        
+        // Add saw cut
+        if (i < pat.pieceAssignments.length && pat.sawWidth > 0) {
+            const sawWidthSize = pat.sawWidth < 1 ? 1 : pat.sawWidth; // Ensure saw width is at least 1mm
+            const sawWidth = sawWidthSize * scale;
+            doc.setFillColor(0, 0, 0); // Black for saw cut
+            doc.rect(cursor, barY, sawWidth, barHeight, 'F');
+            cursor += sawWidth;
+        }
+      });
+      
+      // Add offcut if present
+      if (pat.offcut > 0) {
+        const offcutWidth = pat.offcut * scale;
+        doc.setFillColor(224, 224, 224);
+        doc.setDrawColor(158, 158, 158);
+        doc.rect(cursor, barY, offcutWidth, barHeight, 'F');
+        
+        // Add offcut label if enough space
+        if (offcutWidth > 15) {
+          doc.setTextColor(97, 97, 97);
+          // Convert to string to avoid type error
+          const offcutText = String(Math.round(pat.offcut));
+          doc.text(offcutText, cursor + offcutWidth / 2, barY + barHeight / 2, {
+            align: 'center',
+            baseline: 'middle'
+          });
+          doc.setTextColor(0, 0, 0); // Reset text color
+        }
+      }
+      
+      yPosition += barHeight + 15;
+      
+      // Add used pieces table for this nest
+      const nestUsage = {};
+      pat.pieceAssignments.forEach(a => {
+        const piece = a.piece;
+        const id = piece.label;
+        if (!nestUsage[id]) {
+          nestUsage[id] = {
+            profile: piece.originalPiece.profile,
+            label: piece.label,
+            length: piece.length,
+            count: 0
+          };
+        }
+        nestUsage[id].count++;
+      });
+      
+      const usedHeaders = ['Profile', 'Label', 'Length', 'Qty'];
+      const usedData = Object.values(nestUsage).map(d => [
+        d.profile,
+        String(d.label),  // Ensure label is a string
+        `${d.length} mm`,
+        String(d.count)   // Convert count to string
+      ]);
+      
+      // Create used pieces table
+      doc.autoTable({
+        head: [usedHeaders],
+        body: usedData,
+        startY: yPosition,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      yPosition = doc.lastAutoTable.finalY + 15;
+    });
+    
+    // Add new page for summary tables
+    doc.addPage();
+    yPosition = margin + 10;
+    
+    // Add used pieces table
+    doc.setFontSize(16);
+    doc.text('Used Pieces Summary', margin, yPosition);
+    yPosition += 10;
+    
+    const allUsedHeaders = ['Profile', 'Label', 'Length', 'Qty'];
+    const allUsedData = Object.values(allUsed).map(d => [
+      d.profile,
+      String(d.label),  // Ensure label is a string
+      `${d.length} mm`,
+      String(d.amount)  // Convert amount to string
+    ]);
+    
+    // Create all used pieces table
+    doc.autoTable({
+      head: [allUsedHeaders],
+      body: allUsedData,
+      startY: yPosition,
+      margin: { left: margin, right: margin },
+      tableWidth: contentWidth
+    });
+    
+    yPosition = doc.lastAutoTable.finalY + 15;
+    
+    // Add remaining pieces table if any
+    if (remaining.length) {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 60) {
+        doc.addPage();
+        yPosition = margin + 10;
+      }
+      
+      doc.setFontSize(16);
+      doc.text('Remaining Pieces', margin, yPosition);
+      yPosition += 10;
+      
+      const remainingHeaders = ['Profile', 'Label', 'Length', 'Qty'];
+      const remainingData = remaining.map(r => [
+        r.profile,
+        String(r.label),  // Ensure label is a string
+        `${r.length} mm`,
+        String(r.amount)  // Convert amount to string
+      ]);
+      
+      // Create remaining pieces table
+      doc.autoTable({
+        head: [remainingHeaders],
+        body: remainingData,
+        startY: yPosition,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+    }
+    
+    // Save the PDF
+    doc.save('nesting_report.pdf');
+  }
