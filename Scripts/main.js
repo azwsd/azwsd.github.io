@@ -34,9 +34,11 @@ window.addEventListener("scroll", function () {
 function downloadActiveViews() {
     let zip = new JSZip(); //Create a new ZIP archive
         let promises = [];
+        let hasVisibleViews = false;
 
         Object.keys(stages).forEach(view => {
             if (document.getElementById(view).classList.contains('hide')) return; //Skip hidden views
+            hasVisibleViews = true; //At least one view is visible
             
             let stage = stages[view];
             let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High-resolution export
@@ -51,7 +53,12 @@ function downloadActiveViews() {
             promises.push(promise);
         });
 
-    // Wait for all PNGs to be added, then generate the ZIP
+    if (!hasVisibleViews) {
+        M.toast({ html: 'No visible views to export!', classes: 'rounded toast-error', displayLength: 3000}); // Show error message if no views are visible
+        return;
+    }
+
+    // Wait for all promises to resolve before generating the ZIP
     Promise.all(promises).then(() => {
         zip.generateAsync({ type: 'blob' }).then(blob => {
             let link = document.createElement('a');
@@ -72,11 +79,11 @@ function clickHoleData() {
 
 //Download all views when ctrl + s is pressed
 document.addEventListener('keydown', function (e) {
-    if (e.ctrlKey && e.key === 's') { //Detect Ctrl + S
+    if (e.ctrlKey && e.key.toLowerCase() === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
         downloadActiveViews();
     }
-    else if(e.key === 's') { //Detect S
+    else if(e.key.toLowerCase() === 's') { //Detect S
         e.preventDefault(); //Prevent default browser save behavior
         let stage = stages[activeView]
         let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High resolution export
@@ -155,6 +162,10 @@ document.addEventListener('keydown', function (e) {
         e.preventDefault(); //Prevent default browser save behavior
         document.getElementById('snapDistance').stepDown();
         document.getElementById('saveSettings').click();
+    }
+    else if (e.key.toLowerCase() === 'd') { //Detect d
+        e.preventDefault(); //Prevent default browser save behavior
+        M.Modal.getInstance(document.getElementById('DXFModal')).open(); //Open DXF modal
     }
 });
 

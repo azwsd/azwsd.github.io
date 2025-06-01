@@ -28,11 +28,70 @@
                     <div id="logo">OpenSteel</div>
                     <a href="#" data-target="mobile" class="sidenav-trigger"><i class="material-icons">menu</i></a>
                     <ul class="right hide-on-med-and-down">
-                        <li><a href="#" onclick="loadNestingPage()" class="waves-effect float-left">Linear nesting</a></li>
-                        <li><a href="#about-me" data-target="aboutMeModal" class="waves-effect modal-trigger">About me</a></li>
+                        <li>
+                            <a href="https://www.linkedin.com/in/ahmedmora" class="waves-effect float-left linkedin-link" target="_blank">
+                                <svg class="linkedin" width="2rem" height="2rem" viewBox="0 0 24 24" fill="currentColor"><path fill="#0A66C2" d="M12.225 12.225h-1.778V9.44c0-.664-.012-1.519-.925-1.519-.926 0-1.068.724-1.068 1.47v2.834H6.676V6.498h1.707v.783h.024c.348-.594.996-.95 1.684-.925 1.802 0 2.135 1.185 2.135 2.728l-.001 3.14zM4.67 5.715a1.037 1.037 0 01-1.032-1.031c0-.566.466-1.032 1.032-1.032.566 0 1.031.466 1.032 1.032 0 .566-.466 1.032-1.032 1.032zm.889 6.51h-1.78V6.498h1.78v5.727zM13.11 2H2.885A.88.88 0 002 2.866v10.268a.88.88 0 00.885.866h10.226a.882.882 0 00.889-.866V2.865a.88.88 0 00-.889-.864z"/></svg>
+                                LinkedIn Profile
+                            </a>
+                        </li>
+                        <li><a href='#' data-target='DXFModal' class="waves-effect modal-trigger" onclick="loadDXFSettings()">DXF</a></li>
+                        <li><a href="#" data-target="aboutMeModal" class="waves-effect modal-trigger">About me</a></li>
                     </ul>
                 </div>
             </nav>
+        </div>
+        <!--DXF modal-->
+        <div id="DXFModal" class="modal">
+            <div class="modal-content">
+                <div>
+                    <span class="helper-text">Geometry Layer:</span>
+                    <input id="geometryLayer" type="text" value="Geometry" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Geometry:</span>
+                    <label>
+                        <input type="checkbox" id="geometryVisibility">
+                        <span for="geometryVisibility"></span>
+                    </label>
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Holes Layer:</span>
+                    <input id="holesLayer" type="text" value="Holes" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Holes:</span>
+                    <label>
+                        <input type="checkbox" id="holeVisibility">
+                        <span for="holeVisibility"></span>
+                    </label>
+                </div>
+                <div>
+                    <span class="helper-text">Ignore holes with diameter less than:</span>
+                    <input id="minHoleDia" type="number" min="0" max="9999" value="0" style="width: 7rem">
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Text Layer:</span>
+                    <input id="textLayer" type="text" value="Text" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Text:</span>
+                    <label>
+                        <input type="checkbox" id="textVisibility">
+                        <span for="textVisibility"></span>
+                    </label>
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Snap Layer:</span>
+                    <input id="snapLayer" type="text" value="Snap" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Snap Points:</span>
+                    <label>
+                        <input type="checkbox" id="snapVisibility">
+                        <span for="snapVisibility"></span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <a href='#' class="modal-close waves-effect waves-red btn green" onclick="batchExportToDXF()">Batch Export DXF</a>
+                    <a href='#' class="modal-close waves-effect waves-red btn green" onclick="exportToDXF()">Export DXF</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
         </div>
         <!--About me modal-->
         <div id="aboutMeModal" class="modal">
@@ -43,9 +102,9 @@
                 <p>In addition to NC file visualization, OpenSteel includes a comprehensive <b>Steel Profile Library</b>, allowing you to browse and reference standard steel sections with ease.</p>
                 <p>OpenSteel also performs <b>linear nesting</b> from user input and/or loaded DSTV files, optimizing material usage for your fabrication projects.</p>
                 <p>Whether you're inspecting part geometry, working with steel profiles, or optimizing material utilization through nesting, OpenSteel brings clarity and convenience to your everyday tasks.</p>
-            <div class="modal-footer">
-                <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
-              </div>
+                <div class="modal-footer">
+                    <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
+                </div>
             </div>
         </div>
         <!--Shortcuts  modal-->
@@ -74,6 +133,7 @@
                     <li><b>Home/End</b>Increase/Decrease snap point size</li>
                     <li><b>Page Up/Down</b>Increase/Decrease snap point distance</li>
                     <li><b>F</b>Toggle resizing and dragging of measurement text</li>
+                    <li><b>D</b>Export views as DXF</li>
                     <li><b>S</b>Save the visible area of the active view</li>
                     <li><b>Ctrl + S</b>Save all currently visible areas of views</li>
                     <li><b>O</b>Toggle <span class="view-name">O</span> view on/off</li>
@@ -114,9 +174,11 @@
             <li id="sideNavClearAll"><a data-target="clearAllModal" class="sidenav-close modal-trigger waves-effect float-bottom">Clear all</a></li>
             <ul class="sideNavBottom">
                 <li><a href="#" onclick="downloadActiveViews()" class="waves-effect float-left">Download active views</a></li>
+                <li><a href='#' data-target='DXFModal' class="waves-effect modal-trigger" onclick="loadDXFSettings()">DXF</a></li>
                 <li><a href="#" onclick="loadProfilesPage()" class="waves-effect float-left">Profiles library</a></li>
                 <li><a href="#" onclick="loadNestingPage()" class="waves-effect float-left">Linear nesting</a></li>
-                <li><a href="#about-me" data-target="aboutMeModal" class="sidenav-close modal-trigger float-bottom">About me</a></li>
+                <li><a href="https://www.linkedin.com/in/ahmedmora" class="waves-effect float-left" target="_blank">LinkedIn Profile</a></li>
+                <li><a href="#about-me" data-target="aboutMeModal" class="sidenav-close modal-trigger float-left">About me</a></li>
             </ul>
         </ul>
         
@@ -260,6 +322,7 @@
         <!--Includes js file for jszip-->
         <script src="Scripts/jszip.min.js"></script>
         <!--Custom js files-->
+        <script src="Scripts/konva-to-dxf.js"></script>
         <script src="Scripts/konva-scripts.js"></script>
         <script src="Scripts/blocDrawer.js"></script>
         <script src="Scripts/fileHandler.js"></script>

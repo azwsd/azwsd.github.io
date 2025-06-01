@@ -17,6 +17,22 @@ html, body
     z-index: 9999 !important; /* Ensure the overlay is above other elements */
     position: fixed !important;
 }
+
+.linkedin-link {
+  display: flex;
+  align-items: center;
+}
+
+/*Make text behind the load files button more visable*/
+.fixed-action-btn {
+  opacity: 0.2;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.fixed-action-btn:hover {
+  opacity: 1;
+}
+
 /*Make the about me button in the mobile navbar at the bottom*/
 #mobile
 {
