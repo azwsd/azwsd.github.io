@@ -65,11 +65,13 @@ function selectFile(file){
     selectedFile = file;
     ncParseHeaderData(filePairs.get(selectedFile));
     ncViewsImage(); //Shows the views image
-    //Load piece data
-    setInputValue('piece-profile', profile);
-    setInputValue('piece-length', length);
-    setInputValue('piece-amount', quantity);
-    setInputValue('piece-label', label);
+    //Load piece data for any profile but plate
+    if (profileCode.toUpperCase() != "B") {
+        setInputValue('piece-profile', profile);
+        setInputValue('piece-length', length);
+        setInputValue('piece-amount', quantity);
+        setInputValue('piece-label', label);
+    }
     //Closes side nav
     let sideNav = document.querySelector('.sidenav');
     let instance = M.Sidenav.getInstance(sideNav)
@@ -1839,6 +1841,11 @@ loadStockInput.addEventListener('change', async function(event) {
     const file = event.target.files[0];
     //check if a file was selected
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        M.toast({html: 'Only CSV files are allowed!', classes: 'rounded toast-warning', displayLength: 2000});
+        loadPiecesInput.value = ""; // Clear the input
+        return;
+    }
     const fileData = await file.text();
     //Loads the stock data from the file
     loadStockData(fileData);
@@ -1854,6 +1861,12 @@ loadPiecesInput.addEventListener('change', async function(event) {
     const file = event.target.files[0];
     //check if a file was selected
     if (!file) return;
+    //Load csv files only
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        M.toast({html: 'Only CSV files are allowed!', classes: 'rounded toast-warning', displayLength: 2000});
+        loadPiecesInput.value = ""; // Clear the input
+        return;
+    }
     const fileData = await file.text();
     //Loads the pieces data from the file
     loadPiecesData(fileData);

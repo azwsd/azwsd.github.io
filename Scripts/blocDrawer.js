@@ -487,7 +487,8 @@ function drawNumertaions() {
             fontSize: height, // Set text height as font size
             fontFamily: 'Arial',
             fill: 'black',
-            rotation: angle // Rotate text by given angle
+            rotation: angle, // Rotate text by given angle
+            name: "text"
         });
     
         numeration.strokeScaleEnabled(false);
@@ -586,7 +587,9 @@ function switchView(view, btn) {
     M.Tooltip.getInstance(btn).close(); //Close tooltip
     M.Tooltip.init(document.querySelectorAll('.tooltipped')); //Reinitialize tooltips
 
-    views.forEach(v => handleResize(v)); //Resize views if necessary
+    for (const view of views) handleResize(view);
+    resetScale(); //Reset scale and position of the view
+    stages[Object.keys(stages)[0]].to({ onFinish: () => autoFitAllViews() }); //Ensures all views scale are reset before auto fit is executed
 }
 
 //Create a snap indicator point in a view at x, y

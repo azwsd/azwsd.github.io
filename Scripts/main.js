@@ -91,13 +91,18 @@ window.addEventListener("scroll", function () {
 });
 
 function downloadActiveViews() {
+    let viewCount = 0;
+    let lastView = '';
+    const fileName = selectedFile.substring(0, selectedFile.lastIndexOf('.'));
+    console.log(selectedFile);
     let zip = new JSZip(); //Create a new ZIP archive
         let promises = [];
-        let hasVisibleViews = false;
 
         Object.keys(stages).forEach(view => {
             if (document.getElementById(view).classList.contains('hide')) return; //Skip hidden views
             hasVisibleViews = true; //At least one view is visible
+            viewCount++;
+            lastView = view; //Keep track of the last view processed
             
             let stage = stages[view];
             let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High-resolution export
@@ -106,28 +111,41 @@ function downloadActiveViews() {
             let promise = fetch(dataURL)
                 .then(res => res.blob())
                 .then(blob => {
-                    zip.file(`${view}.png`, blob); // Add PNG file to ZIP
+                    zip.file(`${fileName}-${view}.png`, blob); // Add PNG file to ZIP
                 });
 
             promises.push(promise);
         });
 
-    if (!hasVisibleViews) {
+    if (viewCount == 0) {
         M.toast({ html: 'No visible views to export!', classes: 'rounded toast-error', displayLength: 3000}); // Show error message if no views are visible
         return;
     }
 
-    // Wait for all promises to resolve before generating the ZIP
-    Promise.all(promises).then(() => {
-        zip.generateAsync({ type: 'blob' }).then(blob => {
-            let link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = "views.zip"; // Name of the ZIP file
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    //Wait for all promises to resolve before generating the ZIP or download the only active view
+    if (viewCount == 1) {
+        let stage = stages[lastView]
+        let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High resolution export
+    
+        let link = document.createElement('a');
+        link.href = dataURL;
+        link.download = `${fileName}-${lastView}.png`; //Name based on view name
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    else {
+        Promise.all(promises).then(() => {
+            zip.generateAsync({ type: 'blob' }).then(blob => {
+                let link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${fileName}-views.zip`; //Name of the ZIP file
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
         });
-    });
+    }
     M.Sidenav.getInstance(document.getElementById('mobile')).close(); //Closes side nav
 }
 
@@ -138,6 +156,7 @@ function clickHoleData() {
 
 //Download all views when ctrl + s is pressed
 document.addEventListener('keydown', function (e) {
+    if ( M.Modal.getInstance(document.getElementById('DXFModal')).isOpen ) return; //Ignore key events if DXF modal is open
     if (e.ctrlKey && e.key.toLowerCase() === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
         downloadActiveViews();
@@ -146,10 +165,11 @@ document.addEventListener('keydown', function (e) {
         e.preventDefault(); //Prevent default browser save behavior
         let stage = stages[activeView]
         let dataURL = stage.toDataURL({ pixelRatio: 5 }); //High resolution export
+        const fileName = selectedFile.substring(0, selectedFile.lastIndexOf('.'));
     
         let link = document.createElement('a');
         link.href = dataURL;
-        link.download = `${activeView}.png`; //Name based on view name
+        link.download = `${fileName}-${activeView}.png`; //Name based on view name
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -226,23 +246,20 @@ document.addEventListener('keydown', function (e) {
         e.preventDefault(); //Prevent default browser save behavior
         M.Modal.getInstance(document.getElementById('DXFModal')).open(); //Open DXF modal
     }
-});
-
-//Function buttons shortcuts
-document.addEventListener('keydown', function (e) {
-    if(e.key.toLowerCase() === 'p') activatePanTool();
-    if(e.key.toLowerCase() === 'm') activateMeasureTool();
-    if(e.key.toLowerCase() === 't') toggleSnapIndicators()
-    if(e.key.toLowerCase() === 'c' && !e.ctrlKey) M.Modal.getInstance(document.getElementById('clearMeasurementsModal')).open();
-    if(e.key.toLowerCase() === 'f') {
+    //Function buttons shortcuts
+    else if(e.key.toLowerCase() === 'p') activatePanTool();
+    else if(e.key.toLowerCase() === 'm') activateMeasureTool();
+    else if(e.key.toLowerCase() === 't') toggleSnapIndicators();
+    else if(e.key.toLowerCase() === 'c' && !e.ctrlKey) M.Modal.getInstance(document.getElementById('clearMeasurementsModal')).open();
+    else if(e.key.toLowerCase() === 'f') {
         document.getElementById('measurementTextTransform').click();
         document.getElementById('saveSettings').click();
     } 
     //Switching views
-    if(e.key.toLowerCase() === 'o') document.querySelector(`.viewSwitch[data-view="o"]`).click();
-    if(e.key.toLowerCase() === 'v') document.querySelector(`.viewSwitch[data-view="v"]`).click();
-    if(e.key.toLowerCase() === 'u') document.querySelector(`.viewSwitch[data-view="u"]`).click();
-    if(e.key.toLowerCase() === 'h') document.querySelector(`.viewSwitch[data-view="h"]`).click();
+    else if(e.key.toLowerCase() === 'o') document.querySelector(`.viewSwitch[data-view="o"]`).click();
+    else if(e.key.toLowerCase() === 'v') document.querySelector(`.viewSwitch[data-view="v"]`).click();
+    else if(e.key.toLowerCase() === 'u') document.querySelector(`.viewSwitch[data-view="u"]`).click();
+    else if(e.key.toLowerCase() === 'h') document.querySelector(`.viewSwitch[data-view="h"]`).click();
 });
 
 function loadProfilesPage(){

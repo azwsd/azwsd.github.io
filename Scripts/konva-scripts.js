@@ -10,6 +10,7 @@ let tempLine = null;
 let storedMeasurements = [];
 
 function handleResize(view) {
+    if (document.getElementById(view).classList.contains('hide')) return; //Skip resizing if the view is hidden
     const container = document.getElementById(view);
     const stage = stages[view];
 
@@ -130,7 +131,7 @@ function resetView(view) {
         y: 0,
         scaleX: 1,
         scaleY: 1,
-        duration: 0.3,
+        duration: 0,
         easing: Konva.Easings.EaseInOut
     });
 }
