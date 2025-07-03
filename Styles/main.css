@@ -37,6 +37,11 @@ body.drag-over::before {
     position: fixed !important;
 }
 
+/* Center all materialize icons */
+.material-icons {
+  vertical-align: middle;
+}
+
 .linkedin-link {
   display: flex;
   align-items: center;
@@ -188,6 +193,10 @@ body.drag-over::before {
     background-color: black;
 }
 
+#FNCModal .input-field{
+  min-height: 15rem;
+}
+
 /*Styles the div created dynamically for hole data*/
 .holeInfoContainer {
     display: flex;
@@ -207,6 +216,12 @@ body.drag-over::before {
     margin: 5px 0;
     font-size: 14px;
     color: #333;
+}
+.delHoleBtn {
+  width: 100%;
+}
+#addHoleBtn {
+  width: 100%;
 }
 
 /*Styles the div created dynamically for viewing, deleting and selecting files*/

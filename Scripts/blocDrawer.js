@@ -20,11 +20,11 @@ function drawContours() {
             isFirstIteration = true;
         }
 
-        if(currentContour == 'IK' && isFirstIteration) {
+        if(isFirstIteration) {
             firstX = dataLine[1];
             firstY = dataLine[3];
         }
-        else if(currentContour == 'IK' && !isFirstIteration && dataLine[1] == firstX && dataLine[3] == firstY) resetIteration = true;
+        else if(!isFirstIteration && dataLine[1] == firstX && dataLine[3] == firstY) resetIteration = true;
 
         // Skip drawing the line if the face has changed
         if (prevView !== null && prevView !== currentView) {
@@ -59,7 +59,7 @@ function drawContours() {
         let canvasWidth = stage.width();
         let canvasHeight = stage.height();
 
-        if (arcLine == 1) notchTool = dataLine[10] == "" ? "t" : dataLine[10]; //Get notch tool type
+        if (arcLine == 1) notchTool = dataLine[10];
 
         //Check if the line is an arc and stores it in arcData
         if(dataLine[4] != 0 && arcLine == 0) {
@@ -90,6 +90,7 @@ function drawContours() {
             eY = dataLine[3];
             arcLine = 0;
             arcType = 'partial';
+            if (notchTool == '') notchTool = 'w';
             arcData.push(eX, eY, notchTool);
         }
         else if(dataLine[4] != 0 && arcLine == 2) {
@@ -102,6 +103,11 @@ function drawContours() {
             arcLine = 0;
             arcType = 'full';
             arcData.push(eX, eY);
+        }
+
+        if(resetIteration) {
+            resetIteration = false;
+            isFirstIteration = true;
         }
 
         if (arcData.length !== 0 && arcType === 'partial') {
@@ -149,7 +155,7 @@ function drawContours() {
             }
             else {
                 let isClockwise = arcData[4] > 0 ? false : true;
-                [cX, cY] = calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool); //Get center point correctly
+                [cX, cY] = calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool, view); //Get center point correctly
                 let startAngle = calcAngle(sX, sY, cX, cY);
                 let endAngle = calcAngle(eX, eY, cX, cY);
 
@@ -265,11 +271,6 @@ function drawContours() {
         line.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
         layer.add(line);
         layer.batchDraw();
-
-        if(resetIteration) {
-            resetIteration = false;
-            isFirstIteration = true;
-        }
     }
 }
 
@@ -395,6 +396,92 @@ function changeHoleColor(holeDiv) {
     layer.batchDraw();
 }
 
+const slotInputIds = ['slotWidthInput', 'slotHeightInput', 'slotHeightInput', 'slotAngleInput'];
+
+function enableSlotInputs() {
+    for (inputId of slotInputIds) {
+        const input = document.getElementById(inputId);
+        const container = input?.closest('.input-group');
+        
+        if (input && container) {
+            input.disabled = false;
+            input.style.opacity = '1';
+            container.style.opacity = '1';
+            container.classList.remove('disabled-input');
+        }
+    }
+}
+
+function disableSlotInputs() {
+    for (inputId of slotInputIds) {
+        const input = document.getElementById(inputId);
+        const container = input?.closest('.input-group');
+        
+        if (input && container) {
+            input.disabled = true;
+            input.value = '0.00'; // Clear the value
+            input.style.opacity = '0.5';
+            container.style.opacity = '0.5';
+            container.classList.add('disabled-input');
+        }
+    }
+}
+
+//Disable or enable slot input depending on hole type
+document.addEventListener('DOMContentLoaded', function(){
+    function slotHandler (target) {
+        if (target.value.trim() === 'sl') enableSlotInputs();
+        else disableSlotInputs();
+    }
+    slotHandler(this.getElementById('holeTypeSelect'));
+    document.getElementById('holeTypeSelect').addEventListener('change', (event) => {slotHandler(event.target)});
+});
+
+function getInputValue(inputId) {
+    const input = document.getElementById(inputId);
+    return input.value.trim();
+}
+
+function addHole() {
+    if (filePairs.size === 0) {
+        M.toast({html: 'No Files Loaded!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    if(!selectedFile) {
+        M.toast({html: 'No fFile Selected!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    let holeLine = '';
+    const view = getInputValue('viewSelect');
+    const xPos = parseFloat(getInputValue('xPosInput'));
+    const dimRef = getInputValue('dimRefSelect');
+    const yPos = parseFloat(getInputValue('yPosInput'));
+    const diameter = parseFloat(getInputValue('diameterInput'));
+    const holeType = getInputValue('holeTypeSelect');
+    const depth = parseFloat(getInputValue('depthInput'));
+    const slotWidth = parseFloat(getInputValue('slotWidthInput'));
+    const slotHeight = parseFloat(getInputValue('slotHeightInput'));
+    const slotAngle = parseFloat(getInputValue('slotAngleInput'));
+
+    // Check if any required values are empty/invalid
+    if (holeType === 'sl' && (isNaN(slotWidth) || isNaN(slotHeight) || isNaN(slotAngle))) {
+        M.toast({html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    if (!view || isNaN(xPos) || !dimRef || isNaN(yPos) || isNaN(diameter) || isNaN(depth)) {
+        M.toast({html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+
+    if (holeType === 'sl')  holeLine = `BO\n  ${view}  ${xPos}${dimRef}  ${yPos}  ${diameter}  ${depth}l  ${slotWidth}  ${slotHeight}  ${slotAngle}`;
+    else holeLine = `BO\n  ${view}  ${xPos}${dimRef}  ${yPos}${holeType}  ${diameter}  ${depth}`;
+    holeData.push([view, xPos, dimRef, yPos, holeType, diameter, depth, 'l', slotWidth, slotHeight, slotAngle]);
+
+    filePairs.set(selectedFile, filePairs.get(selectedFile).replace('EN', holeLine + '\nEN'));
+
+    document.querySelector('#files .selected-file').click();
+}
+
 //Draws marks to the canvas
 function drawMarks() {
     let currentView = null;
@@ -484,14 +571,13 @@ function drawNumertaions() {
             x: tX,
             y: tY,
             text: text,
-            fontSize: height, // Set text height as font size
+            fontSize: height * 1.4, // Set text height as font size
             fontFamily: 'Arial',
             fill: 'black',
-            rotation: angle, // Rotate text by given angle
+            rotation: -angle, // Rotate text by given angle
+            offsetY: height * 1.4, // Shift rotation point to bottom-left
             name: "text"
         });
-    
-        numeration.strokeScaleEnabled(false);
         layer.add(numeration);
         layer.batchDraw();
     }
@@ -501,12 +587,11 @@ function drawNumertaions() {
 //Function to apply coordinate transformations based on view
 function transformCoordinates(view, x, y, width, height) {
     switch (view) {
-        case 'v-view': // Bottom-left, X and Y negative
-        case 'u-view': 
+        case 'v-view': // Bottom-left, Y negative
+        case 'u-view': // Bottom-left, Y negative
             return [x, height - y];
-        case 'o-view': // Bottom-right, X and Y negative
-            return [width - x, height - y];
-        case 'h-view': // Top-right, Y negative only
+        case 'o-view': // Top-left
+        case 'h-view': // Top-left
         default:
             return [x, y];
     }
@@ -525,31 +610,50 @@ function calcAngle(pX, pY, cX, cY){
     return angle < 0 ? angle + 360 : angle; // Convert negative angles to 0-360 range
 }
 
-function calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool) {
+function calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool, view) {
     let [mX, mY] = [(sX + eX) / 2, (sY + eY) / 2]; //Center of start and end points
     let l = Math.sqrt(((sX - eX) ** 2) + ((sY - eY) ** 2)); //Distance between start and end points
     //Calculate the two possible centers
     let [solX1, solY1] = [mX + Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY + Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
     let [solX2, solY2] = [mX - Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY - Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
-    //Find the furthest away cX, xY and that's our solution
-    let d1 =  Math.sqrt(((cX - solX1) ** 2) + ((cY - solY1) ** 2));
-    let d2 =  Math.sqrt(((cX - solX2) ** 2) + ((cY - solY2) ** 2));
-    //Handle notch tool 't'
-    if (notchTool == 't') {
+
+    //Calculate the orientation of first solution and return the correct center based on this orientation
+    const sol1Orientation = transformOrientation(view, getArcOrientation(sX, sY, solX1, solY1, eX, eY));
+    if (sol1Orientation == isClockwise) {
+        if (notchTool.toLowerCase() == 'w') return [solX2, solY2];
         return [solX1, solY1];
-    }
-    if (d1 > d2 && isClockwise) {
-        return [solX1, solY1];
-    }
-    else if (d1 < d2 && isClockwise) {
-        return [solX2, solY2];
-    }
-    else if  (d1 > d2 && !isClockwise) {
-        return [solX2, solY2];
     }
     else {
-        return [solX1, solY1];
+        if (notchTool.toLowerCase() == 'w') return [solX1, solY1];
+        return [solX2, solY2];
     }
+}       
+
+//Function to apply clockwise transformations based on view
+function transformOrientation(view, isClockwise) {
+    switch (view) {
+        case 'v-view':
+        case 'u-view': 
+            return !isClockwise;
+        case 'o-view':
+        case 'h-view':
+        default:
+            return isClockwise;
+    }
+}
+
+//Function to calculate if an arc is clockwise or counterclockwise
+function getArcOrientation(startX, startY, centerX, centerY, endX, endY) {
+    //Create vectors from center to start and center to end
+    let startVectorX = startX - centerX;
+    let startVectorY = startY - centerY;
+    let endVectorX = endX - centerX;
+    let endVectorY = endY - centerY;
+    
+    //Calculate cross product
+    let crossProduct = startVectorX * endVectorY - startVectorY * endVectorX;
+    
+    return crossProduct > 0 ? 0 : 1; //Positive counterclockwise, negative clockwise
 }
 
 //Draws blocs to the canves

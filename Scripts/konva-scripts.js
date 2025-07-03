@@ -163,7 +163,15 @@ views.forEach(view => {
     stage.on('click touchstart', e => handleMeasurementClick(stage, e));
     stage.on('mousemove touchmove', e => handleMouseMove(stage, e));
 
-    window.addEventListener("resize", () => handleResize(view));
+    let resizeTimeout;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            for (const view of views) handleResize(view);
+            resetScale();
+            stages[Object.keys(stages)[0]].to({ onFinish: () => autoFitAllViews() });
+        }, 250); // Wait 250ms after last resize event
+    });
 });
 
 //changes the measurement view on click
@@ -346,18 +354,52 @@ function handleMeasurementClick(stage, e) {
             name: 'temp-measurement-line'
         });
 
+        tempGuideLine1 = new Konva.Line({
+            points: [snappedPos.x, snappedPos.y, snappedPos.x, snappedPos.y],
+            stroke: 'gray',
+            strokeWidth: 3,
+            dash: [5, 5],
+            name: 'temp-guide-line'
+        });
+
+        tempGuideLine2 = new Konva.Line({
+            points: [snappedPos.x, snappedPos.y, snappedPos.x, snappedPos.y],
+            stroke: 'gray',
+            strokeWidth: 3,
+            dash: [5, 5],
+            name: 'temp-guide-line'
+        });
+
         tempLine.strokeScaleEnabled(false);
+        tempGuideLine1.strokeScaleEnabled(false);
+        tempGuideLine2.strokeScaleEnabled(false);
+        mLayer.add(tempGuideLine1);
+        mLayer.add(tempGuideLine2);
         mLayer.add(tempLine);
         mLayer.batchDraw();
         isMeasuring = true;
     } 
-    else if (measurementPoints.length === 2) {
+    else if (measurementPoints.length === 3) {
+        measurementPoints = [
+            {x: tempLine.points()[0], y: tempLine.points()[1]},
+            {x: tempLine.points()[2], y: tempLine.points()[3]},
+            {x: tempGuideLine1.points()[0], y: tempGuideLine1.points()[1]},
+            {x: tempGuideLine2.points()[0], y: tempGuideLine2.points()[1]}
+        ];
         if (tempLine) {
             tempLine.destroy();
             tempLine = null;
         }
+        if (tempGuideLine1) {
+            tempGuideLine1.destroy();
+            tempGuideLine1 = null;
+        }
+        if (tempGuideLine2) {
+            tempGuideLine2.destroy();
+            tempGuideLine2 = null;
+        }
 
-        measureDistance(measurementPoints[0], measurementPoints[1], activeMeasurementView, false);
+        measureDistance(measurementPoints[0], measurementPoints[1], measurementPoints[2], measurementPoints[3], activeMeasurementView, false);
 
         measurementPoints = [];
         activeMeasurementView = null;
@@ -373,13 +415,103 @@ function handleMouseMove(stage, e) {
         tempLine.points([measurementPoints[0].x, measurementPoints[0].y, snappedPos.x, snappedPos.y]);
         measurementLayers[activeView].batchDraw();
     }
+    else if (measurementPoints.length === 2 && tempLine) {
+        // Move the temp line parallel to the original line following mouse pointer
+        let pos = getTransformedPosition(stage, stage.getPointerPosition());
+
+        // Calculate the angle from the first measurement center point to the mouse cursor
+        const mouseAngle = Math.atan2(
+            pos.y - (measurementPoints[0].y + measurementPoints[1].y) / 2,
+            pos.x - (measurementPoints[0].x + measurementPoints[1].x) / 2
+        );
+        const mouseAngleDegrees = (mouseAngle * 180 / Math.PI + 360) % 360; // Convert to degrees
+
+        // Snap threshold (in degrees)
+        const snapThreshold = 15;
+
+        // Check if mouse angle is close to horizontal (0° or 180°) or vertical (90° or 270°)
+        let snapToAxis = false;
+        let snapType = null;
+        let lineType = null;
+
+        // Determine if the measurement line is aligned (horizontal or vertical)
+        if (measurementPoints[0].x === measurementPoints[1].x || measurementPoints[0].y === measurementPoints[1].y) lineType = 'aligned';
+
+        // Snap to horizontal (X-axis aligned) - mouse is roughly horizontal from first point
+        if ((mouseAngleDegrees <= snapThreshold) || (mouseAngleDegrees >= 360 - snapThreshold) || 
+            (Math.abs(mouseAngleDegrees - 180) <= snapThreshold)) {
+            snapToAxis = true;
+            snapType = 'horizontal';
+        }
+        // Snap to vertical (Y-axis aligned) - mouse is roughly vertical from first point
+        else if (Math.abs(mouseAngleDegrees - 90) <= snapThreshold || Math.abs(mouseAngleDegrees - 270) <= snapThreshold) {
+            snapToAxis = true;
+            snapType = 'vertical';
+        }
+
+        let newPoint;
+
+        // If snapping to axis, adjust the new point based on the snap type or if the line is aligned make it parallel to the original line
+        if (snapToAxis && lineType !== 'aligned') {
+            if (snapType === 'horizontal') {
+                // Snap to horizontal - show vertical measurement
+                const horizontalOffset = pos.x - measurementPoints[0].x;
+                newPoint = {
+                    x1: measurementPoints[0].x + horizontalOffset,
+                    y1: measurementPoints[0].y,
+                    x2: measurementPoints[0].x + horizontalOffset, // Same X coordinate for vertical line
+                    y2: measurementPoints[1].y
+                };
+            } else if (snapType === 'vertical') {
+                // Snap to vertical - show horizontal measurement
+                const verticalOffset = pos.y - measurementPoints[0].y;
+                newPoint = {
+                    x1: measurementPoints[0].x,
+                    y1: measurementPoints[0].y + verticalOffset,
+                    x2: measurementPoints[1].x,
+                    y2: measurementPoints[0].y + verticalOffset // Same Y coordinate for horizontal line
+                };
+            }
+        } else {
+            // Parallel to the original line
+            const vectorPojection = ((pos.x - measurementPoints[0].x) * (measurementPoints[1].x - measurementPoints[0].x) +
+                (pos.y - measurementPoints[0].y) * (measurementPoints[1].y - measurementPoints[0].y)) /
+                (Math.pow(measurementPoints[1].x - measurementPoints[0].x, 2) +
+                Math.pow(measurementPoints[1].y - measurementPoints[0].y, 2));
+            
+            const closestPoint = {
+                x: measurementPoints[0].x + vectorPojection * (measurementPoints[1].x - measurementPoints[0].x),
+                y: measurementPoints[0].y + vectorPojection * (measurementPoints[1].y - measurementPoints[0].y)
+            };
+            
+            const translationVector = {
+                x: pos.x - closestPoint.x,
+                y: pos.y - closestPoint.y
+            };
+            
+            newPoint = {
+                x1: measurementPoints[0].x + translationVector.x,
+                y1: measurementPoints[0].y + translationVector.y,
+                x2: measurementPoints[1].x + translationVector.x,
+                y2: measurementPoints[1].y + translationVector.y
+            };
+        }
+
+        tempLine.points([newPoint.x1, newPoint.y1, newPoint.x2, newPoint.y2]);
+
+        // Update guide lines to match the new position
+        tempGuideLine1.points([measurementPoints[0].x, measurementPoints[0].y, newPoint.x1, newPoint.y1]);
+        tempGuideLine2.points([measurementPoints[1].x, measurementPoints[1].y, newPoint.x2, newPoint.y2]);
+
+        measurementLayers[activeMeasurementView].batchDraw();
+    }
 }
 
 let measurementColor = localStorage.getItem("measurementColor") || '#808080';
 let measurementTextColor = localStorage.getItem("measurementTextColor") || '#008000';
 let resizeVisible = localStorage.getItem("resizeVisible") === "true" ? true : false;
 let measurementCounter = 0;
-function measureDistance(start, end, view, isRedrawing, index) {
+function measureDistance(start, end, guideStart, guideEnd, view, isRedrawing, index) {
     const mLayer = measurementLayers[view];
     const distance = Math.hypot(end.x - start.x, end.y - start.y).toFixed(2);
     const hDistance = Math.abs(end.x - start.x).toFixed(2);
@@ -396,6 +528,27 @@ function measureDistance(start, end, view, isRedrawing, index) {
         name: lineName,
         listening: false 
     });
+
+    let guideLineName1 = isRedrawing ? `final-guide-line-1-${index}` : `final-guide-line-1-${measurementCounter}`;
+    let guideLine1 = new Konva.Line({
+        points: [start.x, start.y, guideStart.x, guideStart.y],
+        stroke: measurementColor,
+        strokeWidth: 3,
+        dash: [5, 5],
+        name: guideLineName1,
+        listening: false 
+    });
+
+    let guideLineName2 = isRedrawing ? `final-guide-line-2-${index}` : `final-guide-line-2-${measurementCounter}`;
+    let guideLine2 = new Konva.Line({
+        points: [end.x, end.y, guideEnd.x, guideEnd.y],
+        stroke: measurementColor,
+        strokeWidth: 3,
+        dash: [5, 5],
+        name: guideLineName2,
+        listening: false 
+    });
+
 
     const dx = end.x - start.x;
     const dy = end.y - start.y;
@@ -424,15 +577,17 @@ function measureDistance(start, end, view, isRedrawing, index) {
     resizeVisible == false ? labelTransformer.hide() : labelTransformer.show();
 
     line.strokeScaleEnabled(false);
+    guideLine1.strokeScaleEnabled(false);
+    guideLine2.strokeScaleEnabled(false);
     label.perfectDrawEnabled(false);
-    mLayer.add(line, label, labelTransformer);
+    mLayer.add(line, guideLine1, guideLine2, label, labelTransformer);
     mLayer.batchDraw();
 
     if (measurementCounter > 0) document.getElementById('historyDropdownBtn').classList.remove('lighten-3');
 
     if (!isRedrawing) {
         addMeasurementData(measurementCounter, view, distance, hDistance, vDistance);
-        storedMeasurements.push({ start, end, view, measurementCounter });
+        storedMeasurements.push({ start, end, guideStart, guideEnd, view, measurementCounter });
         M.toast({ html: `length: ${distance} mm, X: ${hDistance} mm, Y: ${vDistance} mm`, classes: 'rounded toast-success', displayLength: 3000});
     }
 }

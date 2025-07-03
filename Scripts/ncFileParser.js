@@ -177,7 +177,7 @@ function ncParseHoleData(line) {
         angle = parseFloat(values[6]) || 0.00;
     }
     // Add parsed line to holeData array
-    holeData.push([view, xValue, dimensionRef, yValue, holeType, diameter, depth, slotType, width, height, angle]);
+    holeData.push([view, xValue, dimensionRef, yValue, holeType, diameter, depth, slotType, width, height, angle, holeData.length]);
 }
 
 //Parses Blocs
@@ -321,6 +321,17 @@ function addHoleData() {
         let widthVal = document.createElement('p');
         let heightVal = document.createElement('p');
         let angleVal = document.createElement('p');
+        let delHoleBtn = document.createElement('a');
+        let delHoleIcon = document.createElement('i');
+
+        delHoleIcon.classList.add('material-icons', 'white-text');
+        delHoleIcon.innerHTML = 'delete';
+        delHoleBtn.classList.add('waves-effect', 'waves-light', 'btn', 'red', 'delHoleBtn');
+        delHoleBtn.setAttribute('data-view', holeLine[0]);
+        delHoleBtn.setAttribute('data-x', holeLine[1]);
+        delHoleBtn.setAttribute('data-y', holeLine[3]);
+        delHoleBtn.addEventListener('click', (event) => delHole(event, delHoleBtn));
+        delHoleBtn.appendChild(delHoleIcon);
 
         view.innerHTML = '<strong>View:</strong> ' + holeLine[0];
         if(holeLine[7] === '')
@@ -357,7 +368,7 @@ function addHoleData() {
         angleVal.innerHTML = `<strong>Angle: </strong> ${holeLine[10] ? holeLine[10] + '°' : 'N/A'}`;
 
         holeDiv.classList.add('holeContainer');
-        [view, holeType, xVal, yVal, diaVal, depthVal, widthVal, heightVal, angleVal].forEach(p => { 
+        [view, holeType, xVal, yVal, diaVal, depthVal, widthVal, heightVal, angleVal, delHoleBtn].forEach(p => { 
             p.classList.add('holeInfo');
             holeContent.appendChild(p);
         });
@@ -368,6 +379,56 @@ function addHoleData() {
         holeDiv.classList.add('holeCard', 'hoverable');
         holeDiv.appendChild(holeContent);
         holeInfo.appendChild(holeDiv);
+    }
+}
+
+//Deletes hole from DSTV file and view
+function delHole(e, delHoleBtn) {
+    e.stopPropagation(); //Stop hole infor div from being pressed
+    const view = delHoleBtn.dataset.view;
+    const xVal = delHoleBtn.dataset.x;
+    const yVal = delHoleBtn.dataset.y;
+    const id = delHoleBtn.closest('.holeContainer').dataset.index;
+
+    const lines = filePairs.get(selectedFile).split('\n');
+    const filteredLines = lines.filter(line => {
+        const trimmed = line.trim();
+        
+        //Check if line starts with the wanted view
+        if (trimmed.startsWith(view)) {
+            //Split by any amount of whitespace
+            const parts = trimmed.split(/\s+/);
+            
+            if (parts.length >= 4) {
+                //Extract X value
+                const lineX = parts[1].replace(/[a-zA-Z]+$/, '');
+                //Extract Y value
+                const lineY = parts[2];
+                
+                //Check for match - handle both string and number comparison
+                const xMatch = lineX === xVal || parseFloat(lineX) === parseFloat(xVal);
+                const yMatch = lineY === yVal || parseFloat(lineY) === parseFloat(yVal);
+                
+                if (xMatch && yMatch) return false; //Remove this line (match)
+            }
+        }
+        return true; //Keep this line (no match)
+    });
+    const removedCount = lines.length - filteredLines.length; //Gets the number of removed hole lines
+    filePairs.set(selectedFile, filteredLines.join('\n'));
+    if (removedCount > 0) {
+        for (const [index, holeLine] of holeData.entries()) {
+            if (holeLine[11] == id) {
+                holeData.splice(index, 1);
+                break; //Exit after finding and deleting a match
+            }
+        }
+        const holeDiv = delHoleBtn.closest('.holeContainer');
+        const layer = layers[view + '-view'];
+        const hole = layer.findOne(`.circle-${id}`); //Find the hole by its name
+        hole.destroy(); //Remove hole from view
+        holeDiv.remove(); //Remove hole info card
+        layer.batchDraw();
     }
 }
 
@@ -420,6 +481,8 @@ function deleteMeasurement(btn, event) {
     let view = div.firstElementChild.firstElementChild.innerHTML;
     let layer = measurementLayers[view];
     layer.findOne(`.final-measurement-line-${measurementCounter}`).destroy(); //Find the measurement line by its name
+    layer.findOne(`.final-guide-line-1-${measurementCounter}`).destroy(); //Find the guide line 1 by its name
+    layer.findOne(`.final-guide-line-2-${measurementCounter}`).destroy(); //Find the guide line 2 by its name
     layer.findOne(`.measurement-text-${measurementCounter}`).destroy(); //Find the measurement text by its name
     layer.findOne(`.measurement-transformer-${measurementCounter}`).destroy(); //Find the measurement text transformer by its name
     layer.batchDraw(); //Redraws the layer after modification
@@ -468,7 +531,7 @@ function handleUndefinedViews(){
     const flangeCutEnd = Math.abs(parseFloat(document.getElementById('flangeCutEnd').querySelector('p:first-of-type').innerHTML));
     const isNegativeFCE = (document.getElementById('flangeCutEnd').querySelector('p:first-of-type').innerHTML.trim().startsWith("-"));
 
-   if (['U', 'B', 'L', 'C', 'M'].includes(profile)) {
+   if (['U', 'B', 'L', 'C', 'M', 'RO', 'RU'].includes(profile)) {
         switch (profile) {
             case 'M':
                 if (!viewExists.h) addBackWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
@@ -477,6 +540,8 @@ function handleUndefinedViews(){
                 if (!viewExists.o) addTopFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             case 'L':
                 if (!viewExists.u) addBottomFlange(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
+            case 'RO':
+            case 'RU':
             case 'B':
                 if (!viewExists.v) addFrontWeb(length, height, flangeWidth, flangeThickness, webThickness, webCutStart, isNegativeWCS, webCutEnd, isNegativeWCE, flangeCutStart, isNegativeFCS, flangeCutEnd, isNegativeFCE);
             default:

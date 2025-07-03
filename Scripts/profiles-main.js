@@ -159,6 +159,7 @@ function deleteFile(btn, event){
         document.getElementById('profileViewsImg').src = ''; //Clears profile image
         document.querySelector('#profileDropdownBtn p').innerHTML = 'PROFILE'; //Reset profile button
         document.querySelector('#profileSizeDropdownBtn p').innerHTML = 'SIZE'; //Reset profile size button
+        document.getElementById('weightResult').value = ''; //Reset weight result
         selectedFile = '';
     }
     updateSessionData()
@@ -187,6 +188,7 @@ function clearAllFiles(){
     document.getElementById('profileViewsImg').src = ''; //clears views img
     document.querySelector('#profileDropdownBtn p').innerHTML = 'PROFILE'; //Reset profile button
     document.querySelector('#profileSizeDropdownBtn p').innerHTML = 'SIZE'; //Reset profile size button
+    document.getElementById('weightResult').value = ''; //Reset weight result
     updateSessionData();
     M.toast({html: 'All files were cleared!', classes: 'rounded toast-success', displayLength: 2000}); //shows success message
 }
@@ -455,6 +457,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, height, width, webThickness, flangeThickness, radius, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else if (loadedProfile == 'Rebar' || loadedProfile == 'Round') {
         clearViewProfileData();
@@ -469,6 +472,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, od, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else if (loadedProfile == 'CHS') {
         clearViewProfileData();
@@ -489,6 +493,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, od, thickness, nps, sch, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else if (loadedProfile == 'Flat') {
         clearViewProfileData();
@@ -505,6 +510,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, thickness, width, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else if (loadedProfile == 'Square') {
         clearViewProfileData();
@@ -519,6 +525,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, length, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else if (loadedProfile == 'RHS' || loadedProfile == 'SHS' || loadedProfile == 'L') {
         clearViewProfileData();
@@ -537,6 +544,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, thickness, height, width, code].forEach(e => { profileData.appendChild(e) });
+        debouncedCalcWeight(); //Calculate weight based on selected profile
     }
     else M.toast({html: 'Please choose a correct profile!', classes: 'rounded toast-error', displayLength: 2000});
 }
@@ -560,7 +568,15 @@ function parseCSV(text) {
 }
 
 //Weight calc function
+document.getElementById('Length')?.addEventListener('input', calcWeight);
+document.getElementById('Quantity')?.addEventListener('input', calcWeight);
 let weightValue = 0;
+let debounceTimer;
+// Debounced version of calcWeight with 500ms delay
+function debouncedCalcWeight() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(calcWeight, 100);
+}
 function calcWeight() {
     if (weightValue == 0) {
         M.toast({html: 'Please choose a profile!', classes: 'rounded toast-error', displayLength: 2000})
@@ -573,7 +589,7 @@ function calcWeight() {
         M.toast({html: 'Please enter correct numbers!', classes: 'rounded toast-error', displayLength: 2000})
         return;
     }
-    M.toast({html: `Weight: ${weight} Kg`, classes: 'rounded toast-success', displayLength: 2000});
+    document.getElementById('weightResult').value = weight; //Show result
 }
 
 document.addEventListener('keydown', function (e) {

@@ -91,6 +91,11 @@ window.addEventListener("scroll", function () {
 });
 
 function downloadActiveViews() {
+    M.Modal.getInstance(document.getElementById('exportModal')).close(); //Hide export modal
+    if (selectedFile == '') {
+        M.toast({ html: 'No file selected to export!', classes: 'rounded toast-error', displayLength: 3000}); // Show error message if no file is selected
+        return;
+    }
     let viewCount = 0;
     let lastView = '';
     const fileName = selectedFile.substring(0, selectedFile.lastIndexOf('.'));
@@ -156,7 +161,9 @@ function clickHoleData() {
 
 //Download all views when ctrl + s is pressed
 document.addEventListener('keydown', function (e) {
-    if ( M.Modal.getInstance(document.getElementById('DXFModal')).isOpen ) return; //Ignore key events if DXF modal is open
+    if ( M.Modal.getInstance(document.getElementById('DXFModal')).isOpen ||
+        M.Modal.getInstance(document.getElementById('createModal')).isOpen ||
+        M.Modal.getInstance(document.getElementById('addHoleModal')).isOpen) return; //Ignore key events if DXF/create modals is open
     if (e.ctrlKey && e.key.toLowerCase() === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
         downloadActiveViews();
@@ -183,7 +190,15 @@ document.addEventListener('keydown', function (e) {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
         // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex - 1 > -1) fileElements[selectedIndex - 1].click();
+        if (selectedIndex !== -1 && selectedIndex - 1 > -1) { 
+            fileElements[selectedIndex - 1].click();
+            // Scroll the selected element into view
+            fileElements[selectedIndex - 1].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+        }
     }
     else if(e.key === 'ArrowDown') { //Detect arrow down
         e.preventDefault(); //Prevent default browser save behavior
@@ -194,33 +209,73 @@ document.addEventListener('keydown', function (e) {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
         // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex + 1 < fileElements.length) fileElements[selectedIndex + 1].click();
+        if (selectedIndex !== -1 && selectedIndex + 1 < fileElements.length) { 
+            fileElements[selectedIndex + 1].click();
+            // Scroll the selected element into view
+            fileElements[selectedIndex + 1].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+        }
     }
-    else if(e.key === 'ArrowLeft') { //Detect arrow up
+    else if(e.key === 'ArrowLeft') { //Detect arrow left
+    e.preventDefault(); //Prevent default browser save behavior
+    let holeElements = document.querySelectorAll('.holeCard');
+    let selectedIndex = -1;
+
+    clickHoleData()
+    holeElements.forEach((el, index) => {
+        if (el.classList.contains('selected-file')) selectedIndex = index;
+    });
+    // Select next hole if available
+    if (selectedIndex !== -1 && selectedIndex - 1 > -1) {
+        holeElements[selectedIndex - 1].click();
+        // Scroll the selected element into view
+        holeElements[selectedIndex - 1].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+    }
+        else if(holeElements.length != 0) {
+            holeElements[0].click(); //If no hole is selected select first hole
+            // Scroll the first element into view
+            holeElements[0].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+        }
+    }
+    else if(e.key === 'ArrowRight') { //Detect arrow right
         e.preventDefault(); //Prevent default browser save behavior
         let holeElements = document.querySelectorAll('.holeCard');
         let selectedIndex = -1;
-    
+
         clickHoleData()
         holeElements.forEach((el, index) => {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
-        // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex - 1 > -1) holeElements[selectedIndex - 1].click();
-        else if(holeElements.length != 0) holeElements[0].click(); //If no hole is selected select first hole
-    }
-    else if(e.key === 'ArrowRight') { //Detect arrow down
-        e.preventDefault(); //Prevent default browser save behavior
-        let holeElements = document.querySelectorAll('.holeCard');
-        let selectedIndex = -1;
-    
-        clickHoleData()
-        holeElements.forEach((el, index) => {
-            if (el.classList.contains('selected-file')) selectedIndex = index;
-        });
-        // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex + 1 < holeElements.length) holeElements[selectedIndex + 1].click();
-        else if(holeElements.length != 0) holeElements[0].click(); //If no hole is selected select first hole
+        // Select next hole if available
+        if (selectedIndex !== -1 && selectedIndex + 1 < holeElements.length) {
+            holeElements[selectedIndex + 1].click();
+            // Scroll the selected element into view
+            holeElements[selectedIndex + 1].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+        }
+        else if(holeElements.length != 0) {
+            holeElements[0].click(); //If no hole is selected select first hole
+            // Scroll the first element into view
+            holeElements[0].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+        }
     }
     else if(e.key === 'Home') {
         e.preventDefault(); //Prevent default browser save behavior
@@ -242,9 +297,9 @@ document.addEventListener('keydown', function (e) {
         document.getElementById('snapDistance').stepDown();
         document.getElementById('saveSettings').click();
     }
-    else if (e.key.toLowerCase() === 'd') { //Detect d
+    else if (e.key.toLowerCase() === 'e') { //Detect e
         e.preventDefault(); //Prevent default browser save behavior
-        M.Modal.getInstance(document.getElementById('DXFModal')).open(); //Open DXF modal
+        M.Modal.getInstance(document.getElementById('exportModal')).open(); //Open export modal
     }
     //Function buttons shortcuts
     else if(e.key.toLowerCase() === 'p') activatePanTool();
@@ -282,4 +337,119 @@ document.addEventListener('DOMContentLoaded', function(){
         selectedFile = sessionStorage.getItem('selectedFile');
         selectFile(selectedFile); //Select saved selectedFile in session
     }
+});
+
+let removeHoles = localStorage.getItem("removeHoles") || 1;
+let removeCuts = localStorage.getItem("removeCuts") || 1;
+let removeMitre = localStorage.getItem("removeMitre") || 1;
+
+function getDSTVSettings () {
+    document.getElementById('removeHoles').checked = removeHoles;
+    document.getElementById('removeCuts').checked = removeCuts;
+    document.getElementById('removeMitre').checked = removeMitre;
+}
+
+function setDSTVSettings () {
+    removeHoles = document.getElementById('removeHoles').checked;
+    removeCuts = document.getElementById('removeCuts').checked;
+    removeMitre = document.getElementById('removeMitre').checked;
+    localStorage.setItem("removeHoles", removeHoles);
+    localStorage.setItem("removeCuts", removeCuts);
+    localStorage.setItem("removeMitre", removeMitre);
+}
+
+document.getElementById('exportNCButton').addEventListener('click', getDSTVSettings()); //Loads stored DSTV settings into view
+
+function removeNCBlocks (data, blockCodes) {
+    let lines = data.split(/\r?\n/);
+    let updatedData = '';
+    let currentBlock = '';
+    let prevLine = '';
+    let blockOpening = false;
+    for (const line of lines) {
+        if (['BO', 'SI', 'AK', 'IK', 'PU', 'KO', 'SC', 'TO', 'UE', 'PR', 'KA', 'EN'].includes(line.trim().toUpperCase().slice(0, 2))) {
+            currentBlock = line.trim().toLocaleUpperCase().slice(0, 2);
+            prevLine = line;
+            blockOpening = true;
+            continue;
+        }
+        if (blockCodes.includes(currentBlock)) continue; //Skip block data
+        //Adds block code at the top of each block
+        if (blockOpening) {
+            updatedData += prevLine + '\n';
+            blockOpening = false;
+        }
+        updatedData += line + '\n';
+    }
+    return updatedData;
+}
+
+function removeNCMitre (data) {
+    let lines = data.split(/\r?\n/);
+    let updatedData = '';
+    let lineCounter = 0;
+    for (const line of lines) {
+        if (line.trim().slice(0, 2) == '**') continue;
+        lineCounter++;
+        if (lineCounter > 17 && lineCounter < 22) updatedData += '0.00\n';
+        else updatedData += line + '\n';
+    }
+    return updatedData;
+}
+
+document.getElementById('exportNCButton').addEventListener('click', function(){
+    setDSTVSettings(); //Loads settings into local storage
+    if (filePairs.size === 0) {
+        M.toast({ html: 'No files to export!', classes: 'rounded toast-warning', displayLength: 3000}); //Show error message if no files are loaded
+        return;
+    }
+    if (!selectedFile) {
+        M.toast({ html: 'No selected file to export!', classes: 'rounded toast-warning', displayLength: 3000}); //Show error message if no file is selected
+        return;
+    }
+    let link = document.createElement('a');
+    let data = filePairs.get(selectedFile);
+    //Removes DSTV blocks depending on user settings
+    if (removeCuts && removeHoles) data = removeNCBlocks(data, ['BO', 'IK', 'AK']);
+    else if (removeCuts) data = removeNCBlocks(data, ['IK', 'AK']);
+    else if (removeHoles) data = removeNCBlocks(data, ['BO']);
+    //Removes mitre depending on user settings
+    if (removeMitre) data = removeNCMitre(data);
+    let blob = new Blob([data], { type: 'text/plain' });
+    link.href = URL.createObjectURL(blob);
+    link.download = `${selectedFile}`; //Name of the ZIP file
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
+document.getElementById('batchExportNCButton').addEventListener('click', function(){
+    setDSTVSettings(); //Loads settings into local storage
+    if (filePairs.size === 0) {
+        M.toast({ html: 'No files to export!', classes: 'rounded toast-warning', displayLength: 3000}); //Show error message if no files are loaded
+        return;
+    }
+    else if (filePairs.size === 1) {
+        document.getElementById('exportNCButton').click();
+        return;
+    }
+    let zip = new JSZip(); //Create a new ZIP archive
+    for (let [file, data] of filePairs.entries()) {
+        //Removes DSTV blocks depending on user settings
+        if (removeCuts && removeHoles) data = removeNCBlocks(data, ['BO', 'IK', 'AK']);
+        else if (removeCuts) data = removeNCBlocks(data, ['IK', 'AK']);
+        else if (removeHoles) data = removeNCBlocks(data, ['BO']);
+        //Removes mitre depending on user settings
+        if (removeMitre) data = removeNCMitre(data);
+        let blob = new Blob([data], { type: 'text/plain' });
+        zip.file(`${file}`, blob); // Add file to ZIP
+    }
+    zip.generateAsync({ type: 'blob' }).then(blob => {
+        let link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'DSTV-Export.zip'; //Name of the ZIP file
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
 });
