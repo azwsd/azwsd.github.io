@@ -35,6 +35,42 @@
                 </div>
             </nav>
         </div>
+        <!--DXF to DSTV modal-->
+        <div id="dxfToNCModal" class="modal">
+            <div class="modal-content">
+                <h4>DXF to DSTV Options</h4>
+                <form id="dxfForm" novalidate>
+                    <div class="input-group">
+                        <span class="helper-text">Order:</span>
+                        <input id="dxfOrderInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Drawing:</span>
+                        <input id="dxfDrawingInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Phase:</span>
+                        <input id="dxfPhaseInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Grade:</span>
+                        <input id="dxfGradeInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Quantity:</span>
+                        <input id="dxfQuantityInput" type="number" min="1" step="1" max="99999" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Thickness:</span>
+                        <input id="dxfThicknessInput" type="number" min="0.1" step="0.1" max="99999" class="compact-input" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn waves-effect" id="dxfToNCButton">Done</button>
+                        <a href="#!" class="waves-effect waves-red btn red" id="dxfToNCCloseButton">Close</a>
+                    </div>
+                </form>
+            </div>
+        </div>
         <!--DSTV export modal-->
         <div id="NCModal" class="modal">
             <div class="modal-content">
@@ -534,7 +570,7 @@
                     </ul>
                     <div id="tab1" class="tab-content">
                         <div id="Project"><h5>Project:</h5><p>N/A</p></div>
-                        <div id="Draswing"><h5>Drawing:</h5><p>N/A</p></div>
+                        <div id="Drawing"><h5>Drawing:</h5><p>N/A</p></div>
                         <div id="Phase"><h5>Phase:</h5><p>N/A</p></div>
                         <div id="Piece"><h5>Piece:</h5><p>N/A</p></div>
                         <div id="Grade"><h5>Grade:</h5><p>N/A</p></div>
@@ -584,6 +620,7 @@
         <!--Includes js file for jszip-->
         <script src="Scripts/jszip.min.js"></script>
         <!--Custom js files-->
+        <script src="Scripts/dxf-to-nc.js"></script>
         <script src="Scripts/nc-file-creator.js"></script>
         <script src="Scripts/nc-to-fnc.js"></script>
         <script src="Scripts/konva-to-dxf.js"></script>

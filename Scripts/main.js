@@ -20,6 +20,54 @@ async function handleFiles(files) {
         const fileName = file.name;
         if (!verifyFile(fileName)) continue;
         const fileData = await file.text();
+        // Handle DXF files
+        if (getFileExtension(fileName) === 'dxf') {
+            const element = document.getElementById('dxfToNCModal')
+            const modal = M.Modal.getInstance(element);
+            const processBtn = document.getElementById('dxfToNCButton');
+            const closeBtn = document.getElementById('dxfToNCCloseButton');
+            
+            modal.open(); // Open settings modal
+            
+            // Wait for action from the user
+            await new Promise((resolve) => {
+                const onProcessClick = () => {
+                    // Validate inputs first
+                    if (!validateDxfInputs()) {
+                        return; // Stay in the modal - don't resolve
+                    }
+                    
+                    // Convert the file
+                    const result = convertDxfToNc(fileData, fileName);
+                    if (result === null) {
+                        resolve(); // No valid contour found, resolve immediately
+                        return;
+                    }
+
+                    addFile(fileName.replace(/\.dxf$/, ".nc1"), result, fileCount);
+
+                    // Clean up listeners
+                    processBtn.removeEventListener('click', onProcessClick);
+                    closeBtn.removeEventListener('click', onCloseClick);
+                    modal.close(); // Close the modal
+                    resolve();
+                };
+                
+                const onCloseClick = () => {
+                    // Clean up listeners
+                    processBtn.removeEventListener('click', onProcessClick);
+                    closeBtn.removeEventListener('click', onCloseClick);
+                    modal.close(); // Close the modal
+                    resolve();
+                };
+                
+                processBtn.addEventListener('click', onProcessClick);
+                closeBtn.addEventListener('click', onCloseClick);
+            });
+            
+            // Continue to next file
+            continue;
+        }
         // Add the file to the view
         addFile(fileName, fileData, fileCount);
     }
@@ -99,7 +147,6 @@ function downloadActiveViews() {
     let viewCount = 0;
     let lastView = '';
     const fileName = selectedFile.substring(0, selectedFile.lastIndexOf('.'));
-    console.log(selectedFile);
     let zip = new JSZip(); //Create a new ZIP archive
         let promises = [];
 
@@ -163,7 +210,8 @@ function clickHoleData() {
 document.addEventListener('keydown', function (e) {
     if ( M.Modal.getInstance(document.getElementById('DXFModal')).isOpen ||
         M.Modal.getInstance(document.getElementById('createModal')).isOpen ||
-        M.Modal.getInstance(document.getElementById('addHoleModal')).isOpen) return; //Ignore key events if DXF/create modals is open
+        M.Modal.getInstance(document.getElementById('addHoleModal')).isOpen ||
+        M.Modal.getInstance(document.getElementById('dxfToNCModal')).isOpen) return; //Ignore key events if modals are open
     if (e.ctrlKey && e.key.toLowerCase() === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
         downloadActiveViews();

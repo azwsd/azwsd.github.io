@@ -37,8 +37,9 @@ body.drag-over::before {
     position: fixed !important;
 }
 
-/* Center all materialize icons */
+/* Center all materialize icons and remove built in margin */
 .material-icons {
+  margin: 0 !important;
   vertical-align: middle;
 }
 
@@ -77,6 +78,10 @@ body.drag-over::before {
     display: flex;
     flex-wrap: nowrap; /* Prevents wrapping */
     gap: 5px;
+}
+#functionButtons a:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
 }
 
 /* Decrease gap for mobile devices */
@@ -192,6 +197,105 @@ body.drag-over::before {
 .tabs .indicator {
     background-color: black;
 }
+#tab1 > div:not(:last-child) {
+  margin: 0;
+  margin-top: 1rem;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  transition: all 0.2s ease;
+  width: 100%;
+  min-width: 0; /* Allow shrinking below content width */
+  box-sizing: border-box;
+}
+#tab1 > div:not(:last-child):hover {
+  border-color: #bdbdbd;
+  background: #f5f5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#tab1 h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #424242;
+}
+
+#tab1 p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #212121;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+#tab1 div[id*="Length"] p:last-child,
+#tab1 div[id*="Height"] p:last-child,
+#tab1 div[id*="Width"] p:last-child,
+#tab1 div[id*="Thickness"] p:last-child,
+#tab1 div[id*="Radius"] p:last-child,
+#tab1 div[id*="weight"] p:last-child,
+#tab1 div[id*="Surface"] p:last-child,
+#tab1 div[id*="Cut"] p:last-child {
+    font-size: 12px;
+    color: #757575;
+    font-weight: 400;
+    margin-top: 4px;
+}
+#tab1 > div:last-child {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 24px;
+  border: 2px dashed #e0e0e0;
+  border-radius: 12px;
+  background: transparent;
+  margin-top: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+#tab1 img {
+  width: 100%;
+  height: auto;
+}
+#tab1 #profileViewsImg {
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+@media (max-width: 768px) {
+  #tab1.tab-content {
+    padding: 16px 12px;
+  }
+    
+  #tab1 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+    
+  #tab1 > div:not(:last-child) {
+    padding: 12px;
+  }
+}
+/* Empty state styling for N/A values */
+#tab1 p:first-of-type {
+  opacity: 0.7;
+  font-style: italic;
+}
+#tab1 div:not(:has(p:contains("N/A"))) p:first-of-type {
+  opacity: 1;
+  font-style: normal;
+  font-weight: 600;
+}
+.tab-content:not(.active) {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
 
 #FNCModal .input-field{
   min-height: 15rem;
@@ -220,33 +324,70 @@ body.drag-over::before {
 .delHoleBtn {
   width: 100%;
 }
+.delHoleBtn:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
 #addHoleBtn {
   width: 100%;
 }
+#addHoleBtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
 
 /*Styles the div created dynamically for viewing, deleting and selecting files*/
-.viewFiles
-{
-    border: 1px black solid;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    margin-bottom: 0.5em;
+.viewFiles {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fafafa;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
 }
-.viewFiles p
-{
-    display: inline;
+.viewFiles:hover {
+  border-color: #bdbdbd;
+  background: #f5f5f5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-.viewFiles a
-{
-    width: 4em;
-    border-radius: 1em;
+.viewFiles p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #212121;
+  flex: 1;
+  padding-right: 12px;
+  word-wrap: break-word;
 }
-.selected-file
-{
-    border: 2px #311b92 solid;
+.viewFiles .fileDelete {
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.viewFiles .fileDelete:hover {
+  transform: scale(1.05);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+.selected-file {
+  border: 2px solid #311b92;
+  background: #f3e5f5;
+  box-shadow: 0 2px 12px rgba(49, 27, 146, 0.15);
+}
+.selected-file:hover {
+  border-color: #311b92;
+  background: #ede7f6;
+  box-shadow: 0 4px 16px rgba(49, 27, 146, 0.2);
+}
+.selected-file p {
+  color: #311b92;
+  font-weight: 600;
 }
 
 /*Center Materialize Toast for medium and large screens only*/
@@ -267,7 +408,6 @@ body.drag-over::before {
       overflow-y: hidden;
   }
 }
-
 
 /*Centers materialize floating buttons*/
 .btn-floating
