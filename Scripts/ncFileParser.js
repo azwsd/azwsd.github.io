@@ -27,18 +27,16 @@ function ncParseHeaderData(fileData){
     //clears header data array
     headerData.length = 0;
     let lineCounter = 0;
-    let isFirstIteration = true;
     for (line of splitFileData)
     {
         //removes the leading spaces
         line = line.trimStart();
+        //removes ST line
+        if (line.slice(0, 2).toUpperCase() == 'ST') continue;
         //reads only the first 24 lines
         if (lineCounter == 24) break;
-        //removes ST line and comment line
-        if(isFirstIteration || line.slice(0, 2) == '**') {
-            isFirstIteration = false;
-            continue;
-        };
+        //removes comment lines
+        if(line.slice(0, 2) == '**') continue;
         //removes comments from any line
         line = line.split('**')[0];
         //Check if there are blocs in the header
@@ -107,7 +105,7 @@ function ncParseContourData(line, contourType){
         face = lastFace; // Use the previous face if not present
     }
     lastFace = face; // Update last seen face
-    viewExists[face] = true; //Set the view exists for the current view as true
+    if (contourType == 'AK') viewExists[face] = true; //Set the view exists for the current view as true for contour type AK only
 
     // Extract X-value and check for dimension reference
     let xMatch = values[0].match(/([\d.]+)([A-Za-z]*)$/);

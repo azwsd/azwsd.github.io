@@ -312,7 +312,11 @@ async function handleDrop(e) {
 
 //Parses the header of DSTV file
 //Global variables for important header data
+let order = '';
+let drawing = '';
+let phase = '';
 let label = '';
+let steelQuality = '';
 let profile = '';
 let length = '';
 let quantity = '';
@@ -324,36 +328,46 @@ function ncParseHeaderData(fileData){
     //clears header data array
     headerData.length = 0;
     let lineCounter = 0;
-    let isFirstIteration = true;
     for (line of splitFileData)
     {
-        //removes the leading spaces
-        line = line.trimStart();
+        //Removes \r from the end of string, replaces spaces with dashes, and removes leading and trailing spaces
+        line = line.trim().replace(/\s+/g, '-').replace(/\r$/, '');
+        //removes ST line
+        if (line.slice(0, 2).toUpperCase() == 'ST') continue;
         //reads only the first 24 lines
         if (lineCounter == 24) break;
-        //removes ST line and comment line
-        if(isFirstIteration || line.slice(0, 2) == '**') {
-            isFirstIteration = false;
-            continue;
-        };
+        //removes comment lines
+        if(line.slice(0, 2) == '**') continue;
         //removes comments from any line
         line = line.split('**')[0];
         //Check if there are blocs in the header
         if (blocs.includes(line.slice(0, 2)) && line.slice(2, 1) == ' ')
-            {
-                M.toast({html: 'File header contains an error!', classes: 'rounded toast-warning', displayLength: 2000});
-                break;
-            }
-            //Empty text info handler
-            if (lineCounter > 19 && line.length == 0) line = 'N/A';
-            //Writes part properties to properties div
-            properties[lineCounter].querySelector('p').innerHTML = line;
+        {
+            M.toast({html: 'File header contains an error!', classes: 'rounded toast-warning', displayLength: 2000});
+            break;
+        }
+        //Empty text info handler
+        if (lineCounter > 19 && line.length == 0) line = 'N/A';
+        //Writes part properties to properties div
+        properties[lineCounter].querySelector('p').innerHTML = line;
         //Removes \r from the end of string
         line = line.replace(/\r$/, '');
 
         switch (lineCounter) {
+            case 0:
+                order = line;
+                break;
+            case 1:
+                drawing = line;
+                break;
+            case 2:
+                phase = line;
+                break;
             case 3:
                 label = line;
+                break;
+            case 4:
+                steelQuality = line;
                 break;
             case 5:
                 quantity = line;
@@ -868,17 +882,55 @@ function calculateAndDisplayResults(cuttingNests) {
     document.getElementById('total-waste').textContent = Math.round(totalWaste);
 }
 
+document.addEventListener('DOMContentLoaded', function(){
+    let gripStart = localStorage.getItem("gripStart") || 20;
+    let gripEnd = localStorage.getItem("gripEnd") || 20;
+    let sawWidth = localStorage.getItem("sawWidth") || 3;
+    let preferShorterStocks = localStorage.getItem("preferShorterStocks") || false;
+    let maxUniqueLabels = localStorage.getItem("maxUniqueLabels") || 999;
+    let minOffcut = localStorage.getItem("minOffcut") || 1000;
+
+    document.getElementById('grip-start').value = gripStart;
+    document.getElementById('grip-end').value = gripEnd;
+    document.getElementById('saw-width').value = sawWidth;
+    document.getElementById('shorter-length-preference').checked = preferShorterStocks == 'true';
+    document.getElementById('max-unique-labels').value = maxUniqueLabels;
+    document.getElementById('min-offcut').value = minOffcut;
+});
+
+let cuttingNests = [];
+let nestCounter;
 function optimizeCuttingNests() {
     if (stockItems.length === 0 || pieceItems.length === 0) {
         M.toast({html: 'Please add stock and piece items first!', classes: 'rounded toast-warning', displayLength: 2000});
         return;
     }
 
-    const gripStart = parseFloat(document.getElementById('grip-start').value) || 0;
-    const gripEnd = parseFloat(document.getElementById('grip-end').value) || 0;
-    const sawWidth = parseFloat(document.getElementById('saw-width').value) || 0;
+    const gripStart = parseFloat(document.getElementById('grip-start').value);
+    const gripEnd = parseFloat(document.getElementById('grip-end').value);
+    const sawWidth = parseFloat(document.getElementById('saw-width').value);
     const preferShorterStocks = document.getElementById('shorter-length-preference').checked;
-    const maxUniqueLabels = parseInt(document.getElementById('max-unique-labels').value) || 999;
+    const maxUniqueLabels = parseInt(document.getElementById('max-unique-labels').value);
+    const minOffcut = parseInt(document.getElementById('min-offcut').value);
+    nestCounter = Number(document.getElementById('first-nest-number').value);
+
+    localStorage.setItem("gripStart", gripStart);
+    localStorage.setItem("gripEnd", gripEnd);
+    localStorage.setItem("sawWidth", sawWidth);
+    localStorage.setItem("preferShorterStocks", preferShorterStocks);
+    localStorage.setItem("maxUniqueLabels", maxUniqueLabels);
+    localStorage.setItem("minOffcut", minOffcut);
+    localStorage.setItem("first-nest-number", nestCounter);
+
+    if(isNaN(nestCounter)) {
+        M.toast({html: 'Please Enter Correct First Nest Number!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    // If negative number is given by user reset it to 1
+    if(nestCounter < 1) nestCounter = 1;
+
+    // Clear previous nests
+    cuttingNests = []
 
     // Group pieces by profile
     const profileGroups = {};
@@ -915,12 +967,11 @@ function optimizeCuttingNests() {
                 pieceAssignments: [],
                 offcut: 0,
                 waste: 0,
-                used: false
+                used: false,
+                hasLastPieceWithoutSaw: false // New flag to track if last piece was placed without saw width
             });
         }
     });
-
-    const cuttingNests = [];
 
     for (const profile in profileGroups) {
         if (!stockGroups[profile]) {
@@ -937,6 +988,7 @@ function optimizeCuttingNests() {
             s.used = false;
             s.pieceAssignments = [];
             s.remainingLength = s.usableLength;
+            s.hasLastPieceWithoutSaw = false;
         });
 
         // Sort stocks by length if preferShorterStocks is checked
@@ -1007,15 +1059,21 @@ function binPackingOptimization(pieces, stocks, gripStart, gripEnd, sawWidth, ma
                     position: currentPos,
                     length: unassignedPieces[pieceIndex].length,
                     label: unassignedPieces[pieceIndex].label,
-                    color: unassignedPieces[pieceIndex].color
+                    color: unassignedPieces[pieceIndex].color,
+                    withoutSawWidth: piece.withoutSawWidth || false // Track if placed without saw width
                 });
                 
                 // Update position for next piece
                 currentPos += unassignedPieces[pieceIndex].length;
                 
-                // Add saw width
-                if (index < bestPattern.pieces.length - 1) {
+                // Add saw width only if this piece was placed with saw width
+                if (index < bestPattern.pieces.length - 1 && !piece.withoutSawWidth) {
                     currentPos += sawWidth;
+                }
+                
+                // Update flag if this is the last piece and it was placed without saw width
+                if (index === bestPattern.pieces.length - 1 && piece.withoutSawWidth) {
+                    currentStock.hasLastPieceWithoutSaw = true;
                 }
                 
                 // Remove from unassigned pieces
@@ -1053,8 +1111,8 @@ function generateAllValidPatterns(pieces, stockLength, sawWidth, maxUniqueLabels
             const usedLength = currentPattern.reduce((sum, p, idx) => {
                 // Add piece length
                 let total = sum + p.length;
-                // Add saw width
-                if (idx < currentPattern.length) {
+                // Add saw width only if not the last piece or if it's not marked as withoutSawWidth
+                if (idx < currentPattern.length - 1 && !p.withoutSawWidth) {
                     total += sawWidth;
                 }
                 return total;
@@ -1085,20 +1143,49 @@ function generateAllValidPatterns(pieces, stockLength, sawWidth, maxUniqueLabels
                 continue; // Skip this piece if it would exceed the max unique labels
             }
             
-            // Calculate additional length needed including saw cut
-            const additionalLength = piece.length + sawWidth;
-                
-            // Check if this piece fits
-            if (additionalLength <= remainingLength) {
-                // Add piece to current pattern
-                currentPattern.push(piece);
+            // Try fitting with saw width first
+            const additionalLengthWithSaw = piece.length + sawWidth;
+            
+            if (additionalLengthWithSaw <= remainingLength) {
+                // Add piece to current pattern (with saw width)
+                const pieceWithSaw = { ...piece, withoutSawWidth: false };
+                currentPattern.push(pieceWithSaw);
                 
                 // Update unique labels
                 const updatedUniqueLabels = new Set(uniqueLabels);
                 updatedUniqueLabels.add(newLabel);
                 
                 // Recursive call with remaining length
-                backtrack(i + 1, currentPattern, remainingLength - additionalLength, updatedUniqueLabels);
+                backtrack(i + 1, currentPattern, remainingLength - additionalLengthWithSaw, updatedUniqueLabels);
+                
+                // Backtrack
+                currentPattern.pop();
+            } 
+            // If it doesn't fit with saw width, try without saw width
+            else if (piece.length <= remainingLength) {
+                // Add piece to current pattern (without saw width)
+                const pieceWithoutSaw = { ...piece, withoutSawWidth: true };
+                currentPattern.push(pieceWithoutSaw);
+                
+                // Update unique labels
+                const updatedUniqueLabels = new Set(uniqueLabels);
+                updatedUniqueLabels.add(newLabel);
+                
+                const usedLength = currentPattern.reduce((sum, p, idx) => {
+                    let total = sum + p.length;
+                    if (idx < currentPattern.length - 1 && !p.withoutSawWidth) {
+                        total += sawWidth;
+                    }
+                    return total;
+                }, 0);
+                
+                const waste = stockLength - usedLength;
+                
+                patterns.push({
+                    pieces: [...currentPattern],
+                    waste: waste,
+                    utilization: (usedLength / stockLength) * 100
+                });
                 
                 // Backtrack
                 currentPattern.pop();
@@ -1125,13 +1212,24 @@ function processStockResults(stocks, cuttingNests, gripStart, gripEnd, sawWidth)
         if (stock.used && stock.pieceAssignments.length > 0) {
             // Calculate total used length
             let usedLength = 0;
+            let sawCuts = 0;
+            
             stock.pieceAssignments.forEach((assignment, index) => {
                 usedLength += assignment.length;
+                // Count saw cuts (all pieces except the last one, unless last one is without saw width)
+                if (index < stock.pieceAssignments.length && !assignment.withoutSawWidth) {
+                    sawCuts++;
+                }
             });
             
             // Calculate waste and offcut
-            const totalWaste = (stock.pieceAssignments.length) * sawWidth + gripStart + gripEnd;
-            const offcut = stock.length - usedLength - totalWaste;
+            let totalWaste = sawCuts * sawWidth + gripStart + gripEnd;
+            let offcut = stock.length - usedLength - totalWaste;
+            const minOffcut = parseInt(document.getElementById('min-offcut').value);
+            if (offcut < minOffcut) {
+                totalWaste += offcut; // Add offcut to waste if it's less than minOffcut
+                offcut = 0; // If offcut is less than minOffcut, set to 0
+            }
             
             cuttingNests.push({
                 profile: stock.originalStock.profile,
@@ -1141,7 +1239,8 @@ function processStockResults(stocks, cuttingNests, gripStart, gripEnd, sawWidth)
                 sawWidth: sawWidth,
                 pieceAssignments: stock.pieceAssignments,
                 offcut: offcut,
-                waste: totalWaste
+                waste: totalWaste,
+                hasLastPieceWithoutSaw: stock.hasLastPieceWithoutSaw
             });
         }
     });
@@ -1153,8 +1252,11 @@ function renderCuttingNests(nests) {
     const fragment = document.createDocumentFragment();
     const allUsed = {};
     let remaining = pieceItems.map(i => ({ ...i }));
+    
+    // Get unique nests with their counts
+    const uniqueNests = getUniqueNests(nests);
+    const firstNestNumber = Number(document.getElementById('first-nest-number').value) || 1;
   
-    // --- Helpers ---
     const createElem = (tag, className, html = '') => {
       const el = document.createElement(tag);
       if (className) el.className = className;
@@ -1177,12 +1279,12 @@ function renderCuttingNests(nests) {
     };
   
     const buildStatsRow = (label, value, unit = '') =>
-      `<div class="stat col s3"><span class="stat-label">${label}:</span> <span class="stat-value">${value}${unit}</span></div>`;
+      `<div class="stat col s3"><span class="stat-label">${label}:</span> <span class="stat-value">${value.toFixed(2)}${unit}</span></div>`;
   
-    const buildNestHeader = (pattern, idx) => {
+    const buildNestHeader = (pattern, idx, count) => {
       const header = createElem('div', 'nest-header');
       const title = createElem('h5', 'card-title');
-      title.textContent = `Profile: ${pattern.profile} - Nest #${idx + 1}`;
+      title.textContent = `Profile: ${pattern.profile} - Nest #${firstNestNumber + idx} ${count > 1 ? `(Qty: ${count})` : ''}`;
       
       const stats = createElem('div', 'row nest-stats');
       stats.innerHTML = `
@@ -1288,6 +1390,7 @@ function renderCuttingNests(nests) {
         
         // Add saw cut
         if (i < pattern.pieceAssignments.length && pattern.sawWidth > 0) {
+          if (pattern.pieceAssignments[i].withoutSawWidth) return; // Skip saw cut if last piece was placed without saw width
           const sawCut = createElem('div', 'saw-cut-segment');
           sawCut.style.left = `${(cursor / total * 100)}%`;
           sawCut.style.width = `${(pattern.sawWidth / total * 100)}%`;
@@ -1325,7 +1428,7 @@ function renderCuttingNests(nests) {
       return container;
     };
 
-    // --- Create Tab Structure ---
+    // Create Tab Structure
     const tabsContainer = createElem('div', 'nesting-tabs-container');
     
     // Create tabs ul
@@ -1344,13 +1447,13 @@ function renderCuttingNests(nests) {
     summaryTabLi.appendChild(summaryTabLink);
     tabsUl.appendChild(summaryTabLi);
     
-    // Create tab for each nest
-    nests.forEach((pat, i) => {
+    // Create tab for each unique nest
+    uniqueNests.forEach((uniqueNest, i) => {
       const nestTabId = `nest-tab-${i}`;
       const nestTabLi = createElem('li', 'tab');
       const nestTabLink = createElem('a', 'deep-purple-text');
       nestTabLink.href = `#${nestTabId}`;
-      nestTabLink.textContent = `Nest #${i + 1}`;
+      nestTabLink.textContent = `Nest #${firstNestNumber + i}`;
       nestTabLi.appendChild(nestTabLink);
       tabsUl.appendChild(nestTabLi);
     });
@@ -1388,19 +1491,20 @@ function renderCuttingNests(nests) {
     summaryTitle.textContent = 'Nesting Summary';
     summaryCardContent.appendChild(summaryTitle);
     
-    // Add nest statistics
+    // Add nest statistics using unique nests
     const nestsSummary = createElem('div', 'nests-summary');
     nestsSummary.innerHTML = `
       <h6>Nesting Overview</h6>
       <ul class="collection">
-        ${nests.map((pat, i) => `
+        ${uniqueNests.map((uniqueNest, i) => `
           <li class="collection-item">
             <div class="row">
-              <div class="col l4 s12 m12">Nest #${i + 1} - Profile: ${pat.profile}</div>
-              <div class="col l2 s6 m3">Stock: ${pat.stockLength} mm</div>
-              <div class="col l2 s6 m3">Pieces: ${pat.pieceAssignments.length}</div>
-              <div class="col l2 s6 m3">Offcut: ${pat.offcut} mm</div>
-              <div class="col l2 s6 m3">Waste: ${pat.waste} mm</div>
+              <div class="col l3 s12 m12">Nest #${firstNestNumber + i} - Profile: ${uniqueNest.nest.profile}</div>
+              <div class="col l2 s6 m3">Stock: ${uniqueNest.nest.stockLength.toFixed(2)} mm</div>
+              <div class="col l2 s6 m3">Pieces: ${uniqueNest.nest.pieceAssignments.length}</div>
+              <div class="col l2 s6 m3">Offcut: ${uniqueNest.nest.offcut.toFixed(2)} mm</div>
+              <div class="col l2 s6 m3">Waste: ${uniqueNest.nest.waste.toFixed(2)} mm</div>
+              <div class="col l1 s6 m3">Qty: ${uniqueNest.count}</div>
             </div>
           </li>
         `).join('')}
@@ -1413,36 +1517,48 @@ function renderCuttingNests(nests) {
     
     tabContentContainer.appendChild(summaryTabContent);
     
-    // --- Create nest tabs content ---
+    // Create nest tabs content using unique nests
     const usage = {};
-    nests.forEach((pat, i) => {
-      const nestTabId = `nest-tab-${i}`;
-      const nestTabContent = createElem('div', 'tab-content');
-      nestTabContent.id = nestTabId;
-      
-      const nestCard = createElem('div', 'nest-card card');
-      const cardContent = createElem('div', 'card-content');
-      
-      cardContent.appendChild(buildNestHeader(pat, i));
-      
-      // Pieces summary for this nest
-      const nestUsage = {};
-      pat.pieceAssignments.forEach(a => {
-        recordUsage(nestUsage, { ...a.piece, profile: a.piece.originalPiece.profile, parentID: a.piece.parentID });
-        updateRemaining(a.piece.parentID);
-      });
-      cardContent.appendChild(buildUsageList(nestUsage));
-      
-      // Add responsive nest visualization
-      cardContent.appendChild(createResponsiveNest(pat));
-      
-      nestCard.appendChild(cardContent);
-      nestTabContent.appendChild(nestCard);
-      
-      tabContentContainer.appendChild(nestTabContent);
+    let newNestNumber = 0;
+    uniqueNests.forEach((uniqueNest, i) => {
+        newNestNumber = firstNestNumber + i;
+
+        // Create tab content for each unique nest
+        const nestTabId = `nest-tab-${i}`;
+        const nestTabContent = createElem('div', 'tab-content');
+        nestTabContent.id = nestTabId;
+        
+        const nestCard = createElem('div', 'nest-card card');
+        const cardContent = createElem('div', 'card-content');
+        
+        cardContent.appendChild(buildNestHeader(uniqueNest.nest, i, uniqueNest.count));
+        
+        // Pieces summary for this nest 
+        const nestUsage = {};
+        uniqueNest.nest.pieceAssignments.forEach(a => {
+            recordUsage(nestUsage, { ...a.piece, profile: a.piece.originalPiece.profile, parentID: a.piece.parentID });
+            // Update remaining pieces based on the actual count of this unique nest
+            for (let j = 0; j < uniqueNest.count; j++) {
+            updateRemaining(a.piece.parentID);
+            }
+        });
+        cardContent.appendChild(buildUsageList(nestUsage));
+        
+        // Add responsive nest visualization
+        cardContent.appendChild(createResponsiveNest(uniqueNest.nest));
+        
+        nestCard.appendChild(cardContent);
+        nestTabContent.appendChild(nestCard);
+        
+        tabContentContainer.appendChild(nestTabContent);
     });
+
+    // Set firstNestNumber input value and local storage from newNestNumber
+    newNestNumber++; // Increment for next nest start number
+    document.getElementById('first-nest-number').value = newNestNumber;
+    localStorage.setItem("first-nest-number", newNestNumber);
     
-    // --- Create used pieces tab content ---
+    // Create used pieces tab content
     const usedPiecesTabContent = createElem('div', 'tab-content');
     usedPiecesTabContent.id = usedPiecesTabId;
     
@@ -1476,10 +1592,28 @@ function renderCuttingNests(nests) {
       return card;
     };
     
-    usedPiecesTabContent.appendChild(buildTableCard('Used Pieces', allUsed));
+    // Calculate total used pieces across all unique nests
+    const totalUsed = {};
+    uniqueNests.forEach(uniqueNest => {
+      uniqueNest.nest.pieceAssignments.forEach(a => {
+        const key = a.piece.parentID;
+        if (!totalUsed[key]) {
+          totalUsed[key] = { 
+            label: a.piece.label, 
+            length: a.piece.length, 
+            color: a.piece.color, 
+            profile: a.piece.originalPiece.profile, 
+            amount: 0 
+          };
+        }
+        totalUsed[key].amount += uniqueNest.count;
+      });
+    });
+    
+    usedPiecesTabContent.appendChild(buildTableCard('Used Pieces', totalUsed));
     tabContentContainer.appendChild(usedPiecesTabContent);
     
-    // --- Create remaining pieces tab content ---
+    // Create remaining pieces tab content
     const remainingPiecesTabContent = createElem('div', 'tab-content');
     remainingPiecesTabContent.id = remainingPiecesTabId;
     
@@ -1503,7 +1637,7 @@ function renderCuttingNests(nests) {
     // Create a standard export button
     const exportButton = createElem('a', 'waves-effect waves-light btn-large deep-purple');
     exportButton.innerHTML = '<i class="material-icons left">file_download</i>Export to PDF';
-    exportButton.onclick = () => generatePDF(nests, allUsed, remaining);
+    exportButton.onclick = () => generatePDF(uniqueNests, totalUsed, remaining);
 
     // Create a custom checkbox container that won't be affected by Materialize
     const checkboxContainer = createElem('div', 'custom-checkbox-container');
@@ -1540,7 +1674,7 @@ function renderCuttingNests(nests) {
 }
 
 // Function to generate PDF from the nesting data
-function generatePDF(nests, allUsed, remaining) {
+function generatePDF(uniqueNests, allUsed, remaining) {
     // Get the jsPDF constructor from the window.jspdf object
     const { jsPDF } = window.jspdf;
     
@@ -1564,16 +1698,17 @@ function generatePDF(nests, allUsed, remaining) {
     doc.text('Nesting Summary', margin, yPosition);
     yPosition += 10;
     
-    // Summary table
+    // Summary table using unique nests
     doc.setFontSize(10);
-    const summaryHeaders = ['Nest #', 'Profile', 'Stock Length', 'Nested Pieces', 'Offcut', 'Waste'];
-    const summaryData = nests.map((pat, i) => [
-      `${i + 1}`,
-      pat.profile,
-      `${pat.stockLength} mm`,
-      pat.pieceAssignments.length.toString(),  // Convert to string
-      `${Math.round(pat.offcut)} mm`,
-      `${Math.round(pat.waste)} mm`
+    const summaryHeaders = ['Nest #', 'Profile', 'Stock Length', 'Nested Pieces', 'Offcut', 'Waste', 'Qty'];
+    const summaryData = uniqueNests.map((uniqueNest, i) => [
+      `${nestCounter + i}`,
+      uniqueNest.nest.profile,
+      `${uniqueNest.nest.stockLength} mm`,
+      uniqueNest.nest.pieceAssignments.length.toString(),
+      `${Math.round(uniqueNest.nest.offcut)} mm`,
+      `${Math.round(uniqueNest.nest.waste)} mm`,
+      uniqueNest.count.toString()
     ]);
     
     // Create summary table
@@ -1591,17 +1726,20 @@ function generatePDF(nests, allUsed, remaining) {
     doc.addPage();
     yPosition = margin + 10;
     
-    // Add each nest visualization
-    nests.forEach((pat, idx) => {
+    // Add each unique nest visualization
+    uniqueNests.forEach((uniqueNest, idx) => {
+      const pat = uniqueNest.nest;
+      const count = uniqueNest.count;
+      
       // Check if we need a new page
       if (yPosition > pageHeight - 70) {
         doc.addPage();
         yPosition = margin + 10;
       }
       
-      // Add nest title
+      // Add nest title with quantity
       doc.setFontSize(14);
-      doc.text(`Nest #${idx + 1} - Profile: ${pat.profile}`, margin, yPosition);
+      doc.text(`Nest #${nestCounter + idx} - Profile: ${pat.profile}${count > 1 ? ` (Qty: ${count})` : ''}`, margin, yPosition);
       yPosition += 8;
       
       // Add nest stats
@@ -1612,7 +1750,7 @@ function generatePDF(nests, allUsed, remaining) {
       // Draw nest visualization
       const barHeight = 10;
       const barY = yPosition;
-      isBlackAndWhite = document.getElementById('export-option').checked;
+      const isBlackAndWhite = document.getElementById('export-option').checked;
 
       // Draw stock bar
       doc.setDrawColor(200, 200, 200);
@@ -1668,6 +1806,7 @@ function generatePDF(nests, allUsed, remaining) {
         
         // Add saw cut
         if (i < pat.pieceAssignments.length && pat.sawWidth > 0) {
+            if (pat.pieceAssignments[i].withoutSawWidth) return; // Skip saw cut if last piece was placed without saw width
             const sawWidthSize = pat.sawWidth < 1 ? 1 : pat.sawWidth; // Ensure saw width is at least 1mm
             const sawWidth = sawWidthSize * scale;
             doc.setFillColor(0, 0, 0); // Black for saw cut
@@ -1714,12 +1853,13 @@ function generatePDF(nests, allUsed, remaining) {
         nestUsage[id].count++;
       });
       
-      const usedHeaders = ['Profile', 'Label', 'Length', 'Qty'];
+      const usedHeaders = ['Profile', 'Label', 'Length', 'Qty per Nest', 'Total Qty'];
       const usedData = Object.values(nestUsage).map(d => [
         d.profile,
-        String(d.label),  // Ensure label is a string
+        String(d.label),
         `${d.length} mm`,
-        String(d.count)   // Convert count to string
+        String(d.count),
+        String(d.count * count) // Total quantity including nest count
       ]);
       
       // Create used pieces table
@@ -1746,9 +1886,9 @@ function generatePDF(nests, allUsed, remaining) {
     const allUsedHeaders = ['Profile', 'Label', 'Length', 'Qty'];
     const allUsedData = Object.values(allUsed).map(d => [
       d.profile,
-      String(d.label),  // Ensure label is a string
+      String(d.label),
       `${d.length} mm`,
-      String(d.amount)  // Convert amount to string
+      String(d.amount)
     ]);
     
     // Create all used pieces table
@@ -1777,9 +1917,9 @@ function generatePDF(nests, allUsed, remaining) {
       const remainingHeaders = ['Profile', 'Label', 'Length', 'Qty'];
       const remainingData = remaining.map(r => [
         r.profile,
-        String(r.label),  // Ensure label is a string
+        String(r.label),
         `${r.length} mm`,
-        String(r.amount)  // Convert amount to string
+        String(r.amount)
       ]);
       
       // Create remaining pieces table
@@ -1794,7 +1934,7 @@ function generatePDF(nests, allUsed, remaining) {
     
     // Save the PDF
     doc.save('nesting_report.pdf');
-  }
+}
 
 //Create hidden file input on document load for loading stock and pieces files
 const loadStockInput = document.createElement('input');
@@ -1963,4 +2103,146 @@ function downloadPiecesCSV() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+
+function exportFncNest() {
+    // If no nesting is present return with error
+    if (cuttingNests.length == 0) {
+        M.toast({html: 'No Nesting to Export!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
+
+    if (checkForManualInput() == true) {
+        M.toast({html: 'Some Files are from Manual Input!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
+
+    if (!FNCDrillType) {
+        M.toast({html: 'Please select a drill type!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+
+    const selectElement = document.getElementById('FNCDrillTypeSelect');
+    FNCDrillType = selectElement.value; // Get FNC drill type export value
+    localStorage.setItem('FNCDrillType', FNCDrillType); // Save the selected drill type to local storage
+
+    // Get unqiue labels from nests
+    const labels = getUniqueNestLabels();
+
+    // Create pieces blocks for all nested parts
+    let piecesBlocks = '';
+    Object.entries(labels).forEach(([label, count]) => piecesBlocks += createFNC(pieceItemsFromFiles[label][1], count) + '\n');
+
+    let nestsBlocks = createNestBlocks(nestCounter);
+
+    // Create download link with nesting data
+    let link = document.createElement('a');
+    let blob = new Blob([piecesBlocks + nestsBlocks], { type: 'text/plain' });
+    link.href = URL.createObjectURL(blob);
+    link.download = 'nests.fnc'; //Name of the ZIP file
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+let pieceItemsFromFiles = {};
+function checkForManualInput() {
+    // Create a dictionary from DSTV file paris with peice label as key and file name as value
+    pieceItemsFromFiles = {};
+    for (const [fileName, fileData] of filePairs) {
+        ncParseHeaderData(fileData);
+        pieceItemsFromFiles[label] = [fileName, fileData, order, drawing, phase, label, steelQuality, profileCode, profile];
+    }
+    // Check if a peice item is not in file pairs
+    for (const pieceItem of pieceItems) if (typeof pieceItemsFromFiles[pieceItem.label] === "undefined") return true;
+    // Return false if all peice items are in file pairs (no user manual input)
+    return false;
+}
+
+function getUniqueNestLabels() {
+    const labelCounts = new Map();
+    
+    // Go through every nest in cuttingNest array
+    cuttingNests.forEach(nest => {
+        // Go through each piece in pieceAssignments for this nest
+        nest.pieceAssignments.forEach(piece => {
+            // Count occurrences of each label
+            labelCounts.set(piece.label, (labelCounts.get(piece.label) || 0) + 1);
+        });
+    });
+    
+    return Object.fromEntries(labelCounts);
+}
+
+function createNestBlocks(nestCounter) {
+    let result = '';
+    const uniqueNests = getUniqueNests(cuttingNests);
+    for (const uniqueNest of uniqueNests) {
+        let nestData = `[[BAR]]\n[HEAD]\nN:${nestCounter} `;
+        uniqueNest.nest.pieceAssignments.forEach((piece, index) => {
+            // If constraint material is set, use it instead of pieceSteelQuality
+            const material = constraintMaterial == '' ? pieceItemsFromFiles[piece.label][6] : constraintMaterial;
+            
+            if (index === 0) nestData += `M:${material} CP:${pieceItemsFromFiles[piece.label][7]} P:${pieceItemsFromFiles[piece.label][8]}\nLB${uniqueNest.nest.stockLength} BI${uniqueNest.count} SP${uniqueNest.nest.gripStart} SL${uniqueNest.nest.sawWidth} SC${uniqueNest.nest.gripEnd}\n`;
+            nestData += `[PCS] C:${pieceItemsFromFiles[piece.label][2]} D:${pieceItemsFromFiles[piece.label][3]} N:${pieceItemsFromFiles[piece.label][4]} POS:${pieceItemsFromFiles[piece.label][5]} QT1\n`;
+        });
+        nestCounter++;
+        result += nestData + '\n';
+    }
+    // set first nest number value in local storage after current nest counter
+    localStorage.setItem('first-nest-number', nestCounter);
+    return result;
+}
+
+// Set first nest number value from local storage when fnc nest export modal is open
+document.addEventListener('DOMContentLoaded', function(){
+    document.getElementById('first-nest-number').value = localStorage.getItem('first-nest-number') || 1;
+});
+
+// Function to return unique nests and their count
+function getUniqueNests(nests) {
+    const nestMap = new Map();
+
+    // Helper function to create unique key for nest
+    function createNestKey(nest) {
+        const sortedPieces = nest.pieceAssignments.map(item => ({
+            label: item.piece.originalPiece.label,
+            length: item.piece.originalPiece.length,
+            profile: item.piece.originalPiece.profile,
+            parentID: item.piece.originalPiece.id
+
+        })).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+
+        return JSON.stringify({
+            profile: nest.profile,
+            length: nest.length,
+            pieceAssignments: sortedPieces
+        });
+    }
+
+    // Group nests by unique key
+    nests.forEach((nest, index) => {
+        const key = createNestKey(nest);
+
+        if (nestMap.has(key)) {
+            nestMap.get(key).count++;
+            nestMap.get(key).indices.push(index);
+        }
+        else {
+            nestMap.set(key, {
+                nest: nest,
+                count: 1,
+                indices: [index]
+            });
+        }
+    });
+
+    // Convert map to array
+    const uniqueNests = Array.from(nestMap.values()).map(item => ({
+        nest: item.nest,
+        count: item.count,
+        indices: item.indices
+    }));
+
+    return uniqueNests;
 }

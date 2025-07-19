@@ -1,14 +1,14 @@
 //Parses the header of DSTV file
 //Global variables for important header data
-let order = '';
-let drawing = '';
-let phase = '';
-let label = '';
-let steelQuality = '';
-let quantity = '';
-let profile = '';
-let profileCode = '';
-let length = '';
+let pieceOrder = '';
+let pieceDrawing = '';
+let piecePhase = '';
+let pieceLabel = '';
+let pieceSteelQuality = '';
+let pieceQuantity = '';
+let pieceProfile = '';
+let pieceProfileCode = '';
+let pieceLength = '';
 let height = '';
 let flangeWidth = '';
 let flangeThickness = '';
@@ -26,13 +26,12 @@ function ncLoadHeaderData(fileData){
     {
         //removes the leading spaces
         line = line.trimStart();
-        //reads only the first 20 lines
-        if (lineCounter == 20) break;
-        //removes ST line and comment line
-        if(isFirstIteration || line.slice(0, 2) == '**') {
-            isFirstIteration = false;
-            continue;
-        };
+        //removes ST line
+        if (line.slice(0, 2).toUpperCase() == 'ST') continue;
+        //reads only the first 24 lines
+        if (lineCounter == 24) break;
+        //removes comment lines
+        if(line.slice(0, 2) == '**') continue;
         //removes comments from any line
         line = line.split('**')[0];
         //Check if there are blocs in the header
@@ -46,31 +45,31 @@ function ncLoadHeaderData(fileData){
 
         switch (lineCounter) {
             case 0:
-                order = line;
+                pieceOrder = line;
                 break;
             case 1:
-                drawing = line;
+                pieceDrawing = line;
                 break;    
             case 2:
-                phase = line;
+                piecePhase = line;
                 break; 
             case 3:
-            label = line;
+            pieceLabel = line;
                 break;
             case 4:
-                steelQuality = line;
+                pieceSteelQuality = line;
                 break;
             case 5:
-                quantity = line;
+                pieceQuantity = line;
                 break;
             case 6:
-                profile = line;
+                pieceProfile = line;
                 break;
             case 7:
-                profileCode = line;
+                pieceProfileCode = line;
                 break;
             case 8:
-                length = line;
+                pieceLength = line;
                 break;
             case 9:
                 height = line;
@@ -177,7 +176,7 @@ function createHoleBlock(fileData) {
                 xCoord = xCoord.replace(/[a-zA-Z]+$/, '');
                 
                 // Get FNC face based on face
-                const FNCFace = profileCode == 'L' ? angleFaceMapping[face] : faceMapping[face];
+                const FNCFace = pieceProfileCode == 'L' ? angleFaceMapping[face] : faceMapping[face];
 
                 // Format the hole string
                 const holeString = `[HOL]   ${drillTypeMapping[FNCDrillType]}   ${FNCFace}${diameter} X${xCoord} Y${yCoord}`;
@@ -232,7 +231,7 @@ function createMarkBlock(fileData) {
                 xCoord = xCoord.replace(/[a-zA-Z]+$/, '');
                 
                 // Get FNC face based on face
-                const FNCFace = faceMapping[face];
+                const FNCFace = pieceProfileCode == 'L' ? angleFaceMapping[face] : faceMapping[face];
 
                 // Format the mark string
                 const markString = `[MARK] ${FNCFace} X${xCoord} Y${yCoord} ANG${angle} N:${text}`;
@@ -247,8 +246,8 @@ function createMarkBlock(fileData) {
 }
 
 function createPRFBlock() {
-    let weightText = profileCode == 'B' ? '' : `WL${weightPerMeter}`;
-    switch (profileCode) {
+    let weightText = pieceProfileCode == 'B' ? '' : `WL${weightPerMeter}`;
+    switch (pieceProfileCode) {
         case 'RU':
         case 'RO':
         case 'B':
@@ -257,33 +256,98 @@ function createPRFBlock() {
             weightText = `WL${weightPerMeter}`;
             break;
     }
-    return `[[PRF]]\n[PRF] CP:${profileCodeMapping[profileCode]} P:${profile} SA${height} TA${webThickness} SB${flangeWidth} TB${flangeThickness} ${weightText}`;
+    return `[[PRF]]\n[PRF] CP:${profileCodeMapping[pieceProfileCode]} P:${pieceProfile} SA${height} TA${webThickness} SB${flangeWidth} TB${flangeThickness} ${weightText}`;
 }
 
 function createMaterialBlock() {
-    return `[[MAT]]\n[MAT] M:${steelQuality}`;
+    // If constraint material is set, use it instead of pieceSteelQuality
+    const material = constraintMaterial == '' ? pieceSteelQuality : constraintMaterial;
+    return `[[MAT]]\n[MAT] M:${material}`;
 }
 
-function createPCSBlock() {
-    switch (profileCode) {
+function createPCSBlock(requiredQuantity) {
+    // If required quantity is available use it instead of quantity in header data
+    pieceQuantity = requiredQuantity == 0 ? pieceQuantity : requiredQuantity;
+
+    // If constraint material is set, use it instead of pieceSteelQuality
+    const material = constraintMaterial == '' ? pieceSteelQuality : constraintMaterial;
+
+    if (removeFNCMitre == 'true') {
+        // If removeFNCMitre is true, set all mitre data to 0
+        webStartCut = '0.00';
+        webEndCut = '0.00';
+        flangeStartCut = '0.00';
+        flangeEndCut = '0.00';
+    }
+
+    switch (pieceProfileCode) {
         case 'B':
-            return `[[PCS]]\n[HEAD] C:${order} D:${drawing} N:${phase} POS:${label}\nM:${steelQuality} CP:${profileCodeMapping[profileCode]} P:${profile}\nLP${length} SA${height} TA${webThickness}\nQI${quantity}`;
+            return `[[PCS]]\n[HEAD] C:${pieceOrder} D:${pieceDrawing} N:${piecePhase} POS:${pieceLabel}\nM:${material} CP:${profileCodeMapping[pieceProfileCode]} P:${pieceProfile}\nLP${pieceLength} SA${height} TA${webThickness}\nQI${pieceQuantity}`;
         case 'RO':
         case 'RU':
-            return `[[PCS]]\n[HEAD] C:${order} D:${drawing} N:${phase} POS:${label}\nM:${steelQuality} CP:${profileCodeMapping[profileCode]} P:${profile}\nLP${length} SA${height} TA${profileCode == 'RO' ? height : height/2} RAI${webStartCut} RAF${webEndCut} RBI${flangeStartCut} RBF${flangeEndCut}\nQI${quantity}`;
+            return `[[PCS]]\n[HEAD] C:${pieceOrder} D:${pieceDrawing} N:${piecePhase} POS:${pieceLabel}\nM:${material} CP:${profileCodeMapping[pieceProfileCode]} P:${pieceProfile}\nLP${pieceLength} SA${height} TA${pieceProfileCode == 'RO' ? height : height/2} RAI${webStartCut} RAF${webEndCut} RBI${flangeStartCut} RBF${flangeEndCut}\nQI${pieceQuantity}`;
         default:
-            return `[[PCS]]\n[HEAD] C:${order} D:${drawing} N:${phase} POS:${label}\nM:${steelQuality} CP:${profileCodeMapping[profileCode]} P:${profile}\nLP${length} RAI${webStartCut} RAF${webEndCut} RBI${flangeStartCut} RBF${flangeEndCut}\nQI${quantity}`;
+            return `[[PCS]]\n[HEAD] C:${pieceOrder} D:${pieceDrawing} N:${piecePhase} POS:${pieceLabel}\nM:${material} CP:${profileCodeMapping[pieceProfileCode]} P:${pieceProfile}\nLP${pieceLength} RAI${webStartCut} RAF${webEndCut} RBI${flangeStartCut} RBF${flangeEndCut}\nQI${pieceQuantity}`;
     }
 }
 
-function createFNC(fileData) {
+function createFNC(fileData, requiredQuantity) {
     ncLoadHeaderData(fileData);
-    return `${createPRFBlock()}\n\n${createMaterialBlock()}\n\n${createPCSBlock()}\n${createHoleBlock(fileData)}\n${createMarkBlock(fileData)}`;
+
+    let holeData = '';
+    // If removeFNCHoles is false, create hole block
+    if (removeFNCHoles == 'false') {
+        holeData = '\n' + createHoleBlock(fileData)
+    }
+
+    return `${createPRFBlock()}\n\n${createMaterialBlock()}\n\n${createPCSBlock(requiredQuantity)}${holeData}\n${createMarkBlock(fileData)}`;
 }
 
 let FNCDrillType = localStorage.getItem('FNCDrillType') || 'Punch'; // Default to 'Punch' if not set
+let removeFNCMitre = localStorage.getItem('removeFNCMitre') || 'false'; // Default to 'false' if not set
+let removeFNCHoles = localStorage.getItem('removeFNCHoles') || 'false'; // Default to 'false' if not set
+let constraintMaterial = localStorage.getItem('constraintMaterial') || ''; // Default to empty string if not set
 
-function ncToFnc() {
+function loadFNCSettings() {
+    // Load FNC drill type from local storage
+    const selectElement = document.getElementById('FNCDrillTypeSelect');
+    selectElement.value = FNCDrillType; // Set FNC drill type export value
+    M.FormSelect.init(selectElement); // Re-initialize to show the change
+
+    // Load remove mitre and holes settings
+    const removeMitreCheckbox = document.getElementById('removeFNCMitre');
+    removeMitreCheckbox.checked = removeFNCMitre === 'true';
+    
+    const removeHolesCheckbox = document.getElementById('removeFNCHoles');
+    removeHolesCheckbox.checked = removeFNCHoles === 'true';
+
+    // Load constraint material
+    const constraintMaterialInput = document.getElementById('constraintMaterialInput');
+    constraintMaterialInput.value = constraintMaterial;
+    M.updateTextFields(); // Update text field to show the loaded value
+}
+
+function saveFNCSettings() {
+    // Save FNC drill type to local storage
+    const selectElement = document.getElementById('FNCDrillTypeSelect');
+    FNCDrillType = selectElement.value; // Get FNC drill type export value
+    localStorage.setItem('FNCDrillType', FNCDrillType);
+    // Save remove mitre and holes settings
+    const removeMitreCheckbox = document.getElementById('removeFNCMitre');
+    removeFNCMitre = removeMitreCheckbox.checked ? 'true' : 'false';
+    localStorage.setItem('removeFNCMitre', removeFNCMitre);
+    const removeHolesCheckbox = document.getElementById('removeFNCHoles');
+    removeFNCHoles = removeHolesCheckbox.checked ? 'true' : 'false';
+    localStorage.setItem('removeFNCHoles', removeFNCHoles);
+    // Save constraint material
+    const constraintMaterialInput = document.getElementById('constraintMaterialInput');
+    constraintMaterial = constraintMaterialInput.value.trim().replace(/\s+/g, '-');
+    localStorage.setItem('constraintMaterial', constraintMaterial);
+}
+
+function ncToFnc(requiredQuantity = 0) {
+    saveFNCSettings(); // Save settings before exporting
+
     // Check if a file is selected
     if (!selectedFile) {
         M.toast({html: 'No file selected!', classes: 'rounded toast-warning', displayLength: 2000});
@@ -300,7 +364,7 @@ function ncToFnc() {
     localStorage.setItem('FNCDrillType', FNCDrillType); // Save the selected drill type to local storage
 
     // Create FNC content
-    const fncContent = createFNC(fileData);
+    const fncContent = createFNC(fileData, requiredQuantity);
 
     // Create a Blob with the output string
     const blob = new Blob([fncContent], { type: 'text/plain' });
@@ -318,6 +382,8 @@ function ncToFnc() {
 }
 
 function BatchNcToFnc() {
+    saveFNCSettings(); // Save settings before exporting
+
     // Check if no files are loaded
     if (filePairs.size === 0) {
         M.toast({html: 'No files to export!', classes: 'rounded toast-error', displayLength: 2000});
@@ -362,12 +428,3 @@ function BatchNcToFnc() {
 
     M.Modal.getInstance(document.getElementById('FNCModal')).close(); // Hide FNC export modal
 }
-
-document.addEventListener('DOMContentLoaded', function(){
-   const exportFNCButton = document.getElementById('exportFNCButton');
-   exportFNCButton.addEventListener('click', function() {
-        const selectElement = document.getElementById('FNCDrillTypeSelect');
-        selectElement.value = FNCDrillType; // Set FNC drill type export value
-        M.FormSelect.init(selectElement); // Re-initialize to show the change
-   });
-});
