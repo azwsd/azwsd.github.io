@@ -460,11 +460,13 @@ const stockTable = document.getElementById('stock-table').getElementsByTagName('
 const pieceTable = document.getElementById('piece-table').getElementsByTagName('tbody')[0];
 const cuttingNestsDiv = document.getElementById('cutting-nests');
 const remainingPiecesDiv = document.getElementById('remaining-pieces');
+const downloadOffcutsBtn = document.getElementById('download-offcuts-btn');
 
 // Event Listeners
 addStockBtn.addEventListener('click', addStock);
 addPieceBtn.addEventListener('click', addPiece);
 optimizeBtn.addEventListener('click', optimizeCuttingNests);
+downloadOffcutsBtn.addEventListener('click', downloadOffcutCSV);
   
 // Function to programmatically set input value
 function setInputValue(inputId, value) {
@@ -980,6 +982,7 @@ function optimizeCuttingNests() {
 
     renderCuttingNests(cuttingNests);
     cuttingNestsDiv.classList.remove('hide');
+    downloadOffcutsBtn.classList.remove('hide');
 }
 
 // Modified version of your binPackingOptimization that handles unlimited stock
@@ -2214,6 +2217,8 @@ const loadStockButton = document.getElementById('load-stock');
 const loadPiecesButton = document.getElementById('load-pieces');
 const saveStockButton = document.getElementById('save-stock');
 const savePiecesButton = document.getElementById('save-pieces');
+const clearStockButton = document.getElementById('clear-stock');
+const clearPiecesButton = document.getElementById('clear-pieces');
 
 //clicks a hidden insert element when the list item is clicked
 loadStockButton.addEventListener('click', function() {
@@ -2227,6 +2232,12 @@ saveStockButton.addEventListener('click', function() {
 });
 savePiecesButton.addEventListener('click', function() {
     downloadPiecesCSV();
+});
+clearStockButton.addEventListener('click', function() {
+    clearStock();
+});
+clearPiecesButton.addEventListener('click', function() {
+    clearPieces();
 });
 
 let idCounter = 0; //ID Counter for unique ID's
@@ -2306,6 +2317,26 @@ function loadPiecesData(fileData) {
     M.toast({html: 'Pieces loaded successfully!', classes: 'rounded toast-success', displayLength: 2000});
 }
 
+function clearStock() {
+    if (stockItems.length === 0) {
+        M.toast({html: 'No stock items to clear', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    stockItems = [];
+    renderStockTable();
+    M.toast({html: 'Stock cleared successfully!', classes: 'rounded toast-success', displayLength: 2000});
+}
+
+function clearPieces() {
+    if (pieceItems.length === 0) {
+        M.toast({html: 'No piece items to clear', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    pieceItems = [];
+    renderPieceTable();
+    M.toast({html: 'Pieces cleared successfully!', classes: 'rounded toast-success', displayLength: 2000});
+}
+
 //Download stock items as CSV
 function downloadStockCSV() {
     if (!stockItems || stockItems.length === 0) {
@@ -2327,6 +2358,39 @@ function downloadStockCSV() {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'stock_items.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+//Download offcut items as CSV
+function downloadOffcutCSV() {
+    const uniqueNests = getUniqueNests(cuttingNests);
+    let offcutCount = 0;
+
+    // Create CSV header
+    let csvContent = 'Profile,Length,Amount\n';
+    
+    // Add data rows
+    uniqueNests.forEach(uniqueNest => {
+        const offcut = uniqueNest.nest.offcut;
+        if (offcut <= 0) return; // Skip nests with no offcut
+        csvContent += `${uniqueNest.nest.profile},${uniqueNest.nest.offcut},${uniqueNest.count}\n`;
+        offcutCount += uniqueNest.count;
+    });
+
+    if (offcutCount === 0) {
+        M.toast({html: 'No offcuts to download!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'offcuts.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2470,7 +2534,7 @@ function getUniqueNests(nests) {
 
         return JSON.stringify({
             profile: nest.profile,
-            length: nest.length,
+            length: nest.stockLength,
             pieceAssignments: sortedPieces
         });
     }
