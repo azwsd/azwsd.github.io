@@ -72,6 +72,7 @@ function selectFile(file){
         setInputValue('piece-amount', quantity);
         setInputValue('piece-label', label);
     }
+    updateFileTracker();
     //Closes side nav
     let sideNav = document.querySelector('.sidenav');
     let instance = M.Sidenav.getInstance(sideNav)
@@ -2450,7 +2451,9 @@ function exportFncNest() {
 
     // Create pieces blocks for all nested parts
     let piecesBlocks = '';
-    Object.entries(labels).forEach(([label, count]) => piecesBlocks += createFNC(pieceItemsFromFiles[label][1], count) + '\n');
+    Object.entries(labels).forEach(([label, data]) => {
+        piecesBlocks += createFNC(pieceItemsFromFiles[label][1], data.count, data.isUniqueProfile) + '\n';
+    });
 
     let nestsBlocks = createNestBlocks(nestCounter);
 
@@ -2479,14 +2482,29 @@ function checkForManualInput() {
 }
 
 function getUniqueNestLabels() {
-    const labelCounts = new Map();
+    const labelCounts = new Map(); // Map to track unique labels and their counts
+    const seenProfiles = new Set(); // Set to track unique profiles
     
     // Go through every nest in cuttingNest array
     cuttingNests.forEach(nest => {
         // Go through each piece in pieceAssignments for this nest
         nest.pieceAssignments.forEach(piece => {
-            // Count occurrences of each label
-            labelCounts.set(piece.label, (labelCounts.get(piece.label) || 0) + 1);
+            const key = piece.label;
+            const profile = piece.piece.originalPiece.profile;
+            const isUniqueProfile = !seenProfiles.has(profile);
+            
+            if (!labelCounts.has(key)) {
+                labelCounts.set(key, {
+                    label: piece.label,
+                    count: 0,
+                    profile: profile,
+                    isUniqueProfile: isUniqueProfile
+                });
+            }
+            labelCounts.get(key).count++;
+            
+            // Mark this profile as seen
+            seenProfiles.add(profile);
         });
     });
     
@@ -2564,4 +2582,37 @@ function getUniqueNests(nests) {
     }));
 
     return uniqueNests;
+}
+
+const filesDiv = document.getElementById('files');
+document.addEventListener('DOMContentLoaded', () => {
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                updateFileTracker();
+            }
+        });
+    });
+
+    if (filesDiv) {
+        observer.observe(filesDiv, {
+            childList: true, // Watch for additions/removals of child nodes
+            subtree: false // Only watch direct children
+        });
+    }
+});
+
+function updateFileTracker() {
+    // Get position of selected file
+    const selectedFileElement = filesDiv.querySelector('.selected-file');
+    const childElements = Array.from(filesDiv.querySelectorAll('.viewFiles'));
+    const selectedFileIndex = childElements.indexOf(selectedFileElement);
+
+    const filesCount = childElements.length; // Amount of files loaded
+
+    // Update file tracker text
+    const fileTrackers = document.querySelectorAll('.fileTracker');
+    fileTrackers.forEach(tracker => {
+        tracker.textContent = `File ${selectedFileIndex + 1}/${filesCount}`;
+    });
 }
