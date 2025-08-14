@@ -11,8 +11,7 @@
     <link rel="stylesheet" href="Styles/materialize-icons.css">
     <!--include main style sheet-->
     <link rel="stylesheet" href="Styles/main.css">
-    <!--Removes fav icon error-->
-    <link rel="shortcut icon" href="#">
+    <link rel="icon" href="Images/favicon.png" type="image/x-icon">
 </head>
 <body>
     <!-- fixed navigation bar-->     
@@ -103,7 +102,14 @@
     <!--Mobile navbar-->
     <ul class="sidenav" id="mobile">
         <li><p class="fileTracker">File 0/0</p></li>
-        <li><p class="filesPlaceHolder">Please insert a file/folder</p></li>
+        <li><p class="filesPlaceHolder">
+            Insert files with 
+            <span class="sidenav-close deep-purple-text lighten-3" 
+                style="cursor: pointer;"
+                onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open();">
+                insert button
+            </span>, or using drag and drop.
+        </p></li>
         <li id="sideNavClearAll"><a href="#!" data-target="clearAllModal" class="waves-effect modal-trigger float-left">Clear all</a></li>
         <ul class="sideNavBottom">
             <li><a href="#!" class="waves-effect float-left" onclick="loadIndexPage()">DSTV Viewer</a></li>
@@ -117,7 +123,14 @@
         <div class="row">
             <div class="col l2 hide-on-med-and-down deep-purple lighten-2" id="files">
                 <p class="fileTracker">File 0/0</p>
-                <p class="filesPlaceHolder">Please insert a file/folder</p>
+                <p class="filesPlaceHolder">
+                    Insert files with 
+                    <span class="white-text lighten-3" 
+                        style="cursor: pointer;"
+                        onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open()">
+                        insert button
+                    </span>, or using drag and drop.
+                </p>
             </div>
             <div class="col l8 m12 s12" id="nestingDiv">
                 <div class="card-panel">
@@ -248,15 +261,28 @@
                         <div class="card-panel">
                           <div class="row">
                             <!-- Shorter Length Preference -->
-                            <div class="col s12 m6 l4 custom-checkbox-container" style="background-color: white;">
+                            <div class="col s12 m6 l4 custom-checkbox-container">
                                 <input type="checkbox" id="shorter-length-preference"/>
                                 <label for="shorter-length-preference" style="color: black;">Prefer Shorter Stocks First</label>
                             </div>
 
                             <!-- Unlimited Material -->
-                            <div class="col s12 m6 l4 custom-checkbox-container" style="background-color: white;">
+                            <div class="col s12 m6 l4 custom-checkbox-container">
                                 <input type="checkbox" id="unlimited-stock-preference"/>
-                                <label for="unlimited-stock-preference" style="color: black;">Use Unlimited 12000mm Stock</label>
+                                <label for="unlimited-stock-preference" style="color: black;">Use Unlimited Stock</label>
+                            </div>
+
+                            <div class="col s12 m6 l4">
+                              <div class="input-field">
+                                    <input type="number" id="unlimited-stock-length" min="0" value="12000" class="validate">
+                                    <label for="unlimited-stock-length" class="active">Unlimited Stock Length (mm)</label>
+                              </div>
+                            </div>
+
+                            <!-- Group Unique Nests -->
+                            <div class="col s12 m6 l4 custom-checkbox-container">
+                                <input type="checkbox" id="group-unique-nests"/>
+                                <label for="group-unique-nests" style="color: black;">Group Unique Nests</label>
                             </div>
                             
                             <!-- Max Unique Pieces Per Stock -->
@@ -300,7 +326,7 @@
                             </div>
                             
                             <!-- First Nest Number -->
-                            <div class="col s12 m8 l8">
+                            <div class="col s12 m4 l4">
                               <div class="input-field">
                                     <input type="number" id="first-nest-number" min="1" value="1" class="validate">
                                     <label for="first-nest-number" class="active">First Nest Number</label>
@@ -362,10 +388,13 @@
     </main>
 
     <div class="fixed-action-btn">
-        <a class="btn-floating btn-large deep-purple darken-4">
+        <a class="btn-floating btn-large deep-purple darken-4" id="fileInputBtn">
             <i class="large material-icons tooltipped" data-position="left" data-tooltip="Insert" onclick="insert_file(this)"><input type="file" hidden id="fileInput" placeholder="File input" directory multiple>insert_drive_file</i>
         </a>
     </div>
+
+    <!-- Tap Target Structure -->
+    <div class="tap-target deep-purple darken-4" data-target="fileInputBtn" id="fileInputTapTarget"></div>
 
     <!--Includes js file for materialize-->
     <script src="Scripts/nc-to-fnc.js"></script>

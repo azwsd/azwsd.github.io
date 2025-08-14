@@ -32,6 +32,37 @@ body.drag-over::before {
     font-size: 2rem;
     font-weight: bold;
 }
+
+/* Custom scrollbar */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px; /* For horizontal scrollbars */
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+    background: #311b92;
+    border-radius: 3px;
+    border: 1px solid #f1f1f1; /* Adds subtle border */
+}
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+    background: #512da8;
+}
+/* Corner styling when both scrollbars are present */
+*::-webkit-scrollbar-corner {
+    background: #f1f1f1;
+}
+
 .materialboxed.active & .materialbox-overlay {
     z-index: 9999 !important; /* Ensure the overlay is above other elements */
     position: fixed !important;
@@ -457,9 +488,12 @@ body.drag-over::before {
   font-weight: 600;
 }
 .fileTracker {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   text-align: center;
   margin: 0;
-  margin-top: 1rem;
+  margin: 1rem 0;
   padding: 0.5rem;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -487,12 +521,6 @@ body.drag-over::before {
         bottom: auto !important;
         max-width: none !important;
     }
-}
-@media (min-width: 993px) { 
-  html, body
-  {
-      overflow-y: hidden;
-  }
 }
 
 /*Centers materialize floating buttons*/
@@ -549,83 +577,397 @@ body.drag-over::before {
     overflow: hidden; /* Ensures Konva does not overflow */
 }
 
-/*Profiles page styling*/
+/* Profiles page styling */
+.profile-input-container {
+    margin-bottom: 1.5rem;
+}
+.profile-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+.profile-input-field {
+    flex: 1; /* Takes most of the available width */
+    min-width: 0; /* Prevents flex item from overflowing */
+}
+.profile-input-field .input-field {
+    margin-bottom: 0;
+}
 #profileDiv {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: auto;
+    min-height: calc(100vh - 94px);
+    padding: 2rem;
     box-sizing: border-box;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 15px;
+    margin: 1rem 0;
+    box-shadow: 0 8px 32px rgba(49, 27, 146, 0.1);
+    overflow-y: auto; /* Allows scrolling if content overflows */
 }
 #profileContentDiv {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-#profileContentDiv .col {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-}
-#profileContentDiv .col:first-child {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 2rem;
     width: 100%;
+    max-width: 1400px;
+    align-items: start;
 }
-#profileContentDiv a p {
-    display: inline;
+/* Profile Selection Panel */
+#ProfileSelection {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(49, 27, 146, 0.1);
+    transition: all 0.3s ease;
 }
-#ProfileSelection, #profileData{
-    display: block;
+#ProfileSelection:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
+/* Dropdown buttons styling */
+#profileDropdownBtn,
+#profileSizeDropdownBtn {
+    margin: 0 !important;
+    margin-bottom: 0.5rem !important;
+    width: 48px !important; /* Fixed small width */
+    height: 48px !important; /* Square button */
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    font-weight: 500;
+    background: linear-gradient(45deg, #311b92, #512da8) !important;
+    box-shadow: 0 3px 15px rgba(49, 27, 146, 0.3) !important;
+    transition: all 0.3s ease !important;
+    min-height: 48px;
+    min-width: 48px;
+    box-sizing: border-box !important;
+    position: relative;
+    flex-shrink: 0; /* Prevents button from shrinking */
+}
+#profileDropdownBtn:hover,
+#profileSizeDropdownBtn:hover {
+    background: linear-gradient(45deg, #512da8, #673ab7) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 20px rgba(49, 27, 146, 0.4) !important;
+}
+#profileDropdownBtn .material-icons,
+#profileSizeDropdownBtn .material-icons {
+    font-size: 1.5rem;
+    margin: 0;
+    color: white;
+}
+.profile-input-field .input-field input[type="text"] {
+    font-size: 1rem;
+    padding-right: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+.profile-input-field .input-field .prefix {
+    font-size: 1.2rem;
+    color: #673ab7;
+}
+.profile-input-field .input-field label {
+    color: #9e9e9e;
+    font-size: 0.9rem;
+}
+.profile-input-field .input-field label.active {
+    color: #673ab7;
+    font-size: 0.8rem;
+}
+.profile-input-field .input-field input[type="text"]:focus {
+    border-bottom: 2px solid #673ab7 !important;
+    box-shadow: 0 1px 0 0 #673ab7 !important;
+}
+.profile-input-field .input-field input[type="text"]:focus + label {
+    color: #673ab7 !important;
+}
+.profile-input-field .input-field input[type="text"]:disabled {
+    color: #9e9e9e;
+    border-bottom: 1px dotted #9e9e9e;
+    background: transparent;
+}
+.profile-input-field .input-field input[type="text"]:disabled + label {
+    color: #9e9e9e;
+}
+.autocomplete-content {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid rgba(103, 58, 183, 0.1) !important;
+}
+.autocomplete-content li > span {
+    color: #673ab7 !important;
+    font-weight: 500 !important;
+}
+/* Profile Data Panel */
 #profileData {
-    height: 20vh;
-    border: 2px #311b92 solid;
-    border-radius: 1em;
-    width: 20vw;
-    overflow: auto;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 2px solid #e8eaf6;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    font-family: 'Roboto', sans-serif;
 }
+#profileData:hover {
+    border-color: #311b92;
+    box-shadow: 0 6px 25px rgba(49, 27, 146, 0.15);
+}
+#profileData p {
+    margin: 0.8rem 0;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(90deg, #f8f9ff, #fff);
+    border-left: 4px solid #311b92;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    color: #424242;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+#profileData p:hover {
+    transform: translateX(3px);
+    box-shadow: 0 3px 12px rgba(49, 27, 146, 0.1);
+    background: linear-gradient(90deg, #e8eaf6, #f3e5f5);
+}
+/* Profile Image Panel */
 #profileImage {
-    margin: auto;
-    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(49, 27, 146, 0.1);
+    transition: all 0.3s ease;
 }
-.dropDownLimitHeight {
-    height: 25vh;
+#profileImage:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 #profileImage img {
-    max-height: 40vh;
-    max-width: 40vw;
+    max-height: 350px;
+    max-width: 100%;
     object-fit: contain;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 4px 15px rgba(0, 0, 0, 0.1));
 }
+/* Weight Calculator Panel */
 #weightCalc {
-    width: 60vw;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(49, 27, 146, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: all 0.3s ease;
 }
-#weightCalc input{
-    width: 15%;
-    margin-left: 5%;
+#weightCalc:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
-#weightCalc a{
-    margin: 5%;
+/* Input styling */
+#weightCalc .input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
 }
-@media (max-width: 992px) {
+#weightCalc input {
+    flex: 1;
+    padding: 0.8rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    background: #fafafa;
+    min-width: 0;
+}
+#weightCalc input:focus {
+    border-color: #311b92;
+    background: white;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(49, 27, 146, 0.1);
+}
+#weightCalc input[disabled] {
+    background: linear-gradient(45deg, #e8eaf6, #c5cae9);
+    color: #311b92;
+    font-weight: 600;
+    border-color: #311b92;
+}
+#weightCalc p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+    min-width: fit-content;
+}
+/* Dropdown content styling */
+.dropDownLimitHeight {
+    max-height: 250px;
+    overflow-y: auto;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid rgba(49, 27, 146, 0.1) !important;
+}
+.dropdown-content li > a {
+    padding: 0.8rem 1.2rem !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+    border-bottom: 1px solid #f5f5f5 !important;
+}
+.dropdown-content li > a:hover {
+    background: linear-gradient(90deg, #e8eaf6, #f3e5f5) !important;
+    color: #311b92 !important;
+    padding-left: 1.5rem !important;
+}
+/* Loading and empty states */
+#profileData:empty::before {
+    content: "Select a profile and size to view details";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9e9e9e;
+    font-style: italic;
+    text-align: center;
+    font-size: 0.9rem;
+}
+@media (max-width: 993px) {
+    #profileContentDiv {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }   
+    .dropdown-trigger p {
+        font-size: 0.8rem;
+    }
     #profileDiv {
-        justify-content: center;
-        align-items: center;
-        margin-left: auto;
-        margin-right: auto;
-        height: auto;
+       padding-top: 0.1vh;
     }
+}
+@media (max-width: 768px) {
+    #profileDiv {
+        padding: 1rem; /* Reduced padding for smaller screens */
+        min-height: calc(100vh - 80px); /* Adjusted for mobile header */
+    }
+    #ProfileSelection,
+    #profileData,
+    #profileImage,
     #weightCalc {
-        width: 100vw;
+        padding: 1rem;
     }
+    #profileImage img {
+        max-height: 250px;
+    }
+    .dropdown-trigger {
+        font-size: 0.8rem !important;
+        padding: 0.7rem 1rem !important;
+        min-height: 40px;
+    }
+    .dropdown-trigger p {
+        font-size: 0.75rem;
+        padding-right: 0.5rem;
+    }
+    #profileDropdownBtn .material-icons,
+    #profileSizeDropdownBtn .material-icons {
+        font-size: 1rem;
+    }
+    .profile-controls {
+        gap: 0.5rem;
+    }
+    #profileDropdownBtn,
+    #profileSizeDropdownBtn {
+        width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        min-width: 40px !important;
+        margin-bottom: 0.25rem !important;
+    }
+    #profileDropdownBtn .material-icons,
+    #profileSizeDropdownBtn .material-icons {
+        font-size: 1.2rem !important;
+    }
+    .profile-input-field .input-field input[type="text"] {
+        font-size: 0.9rem;
+    }
+    .profile-input-field .input-field .prefix {
+        font-size: 1rem;
+    }
+    .profile-input-field .input-field label {
+        font-size: 0.8rem;
+    }
+    .profile-input-field .input-field label.active {
+        font-size: 0.7rem;
+    }
+    .profile-input-container {
+        margin-bottom: 1rem;
+    }
+}
+@media (max-width: 480px) {
+    #profileDiv {
+        padding: 0.5rem; /* Reduced padding for very small screens */
+        margin: 0.5rem 0; /* Reduced margin */
+        min-height: calc(100vh - 70px); /* Adjusted for mobile */
+    }
+    #profileContentDiv {
+        gap: 1rem;
+    }   
     #profileData {
-        width: 60vw;
+        min-height: 150px;
+        max-height: 200px;
+    }
+    #profileImage img {
+        max-height: 200px;
+    }
+    .dropdown-trigger {
+        padding: 0.6rem 0.8rem !important;
+        min-height: 36px;
+    }
+    .dropdown-trigger p {
+        font-size: 0.7rem;
+        padding-right: 0.4rem;
+    }
+    #profileDropdownBtn .material-icons,
+    #profileSizeDropdownBtn .material-icons {
+        font-size: 0.9rem;
+        min-width: 20px;
+    }
+    .profile-controls {
+        gap: 0.25rem;
+    }
+    #profileDropdownBtn,
+    #profileSizeDropdownBtn {
+        width: 36px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        min-width: 36px !important;
+    }
+    #profileDropdownBtn .material-icons,
+    #profileSizeDropdownBtn .material-icons {
+        font-size: 1rem !important;
+    }
+}
+@media (max-height: 600px) {
+    #profileDiv {
+        min-height: auto; /* Remove min-height constraint on very short screens */
+        padding: 1rem;
+    }
+    
+    #profileImage img {
+        max-height: 150px;
+    }
+    
+    #profileData {
+        max-height: 150px;
     }
 }
 
@@ -876,6 +1218,7 @@ table th, table td {
   }
 }
 
+/* Custom checkbox styling */
 .custom-checkbox-container {
   display: flex;
   align-items: center;
@@ -885,12 +1228,10 @@ table th, table td {
   color: #673ab7; /* Materialize deep-purple */
   user-select: none;
 }
-
 .custom-checkbox-container {
   display: inline-block;
   margin: 10px 0;
   font-family: inherit;
-  background-color: #673ab7;
   height: 54px;
   line-height: 54px;
   font-size: 15px;

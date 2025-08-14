@@ -37,12 +37,12 @@ function filesPlaceHolder(){
     let mapSize = filePairs.size;
     if (mapSize == 0){
         document.querySelectorAll('.filesPlaceHolder').forEach(el => {
-            el.style.visibility = 'visible';
+            el.classList.remove('hide');
         });
     }
     else{
         document.querySelectorAll('.filesPlaceHolder').forEach(el => {
-            el.style.visibility = 'hidden';
+            el.classList.add('hide');
         });
     }
 }
@@ -433,7 +433,15 @@ document.addEventListener('keydown', function (e) {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
         // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex - 1 > -1) fileElements[selectedIndex - 1].click();
+        if (selectedIndex !== -1 && selectedIndex - 1 > -1) { 
+            fileElements[selectedIndex - 1].click();
+            // Scroll the selected element into view
+            fileElements[selectedIndex - 1].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+        });
+        }
     }
     else if(e.key === 'ArrowDown') { //Detect arrow down
         e.preventDefault(); //Prevent default browser save behavior
@@ -444,7 +452,15 @@ document.addEventListener('keydown', function (e) {
             if (el.classList.contains('selected-file')) selectedIndex = index;
         });
         // Select next file if available
-        if (selectedIndex !== -1 && selectedIndex + 1 < fileElements.length) fileElements[selectedIndex + 1].click();
+        if (selectedIndex !== -1 && selectedIndex + 1 < fileElements.length) { 
+            fileElements[selectedIndex + 1].click();
+            // Scroll the selected element into view
+            fileElements[selectedIndex + 1].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'nearest'
+            });
+        }
     }
 });
 
@@ -830,6 +846,8 @@ document.addEventListener('DOMContentLoaded', function(){
     let maxUniqueLabels = localStorage.getItem("maxUniqueLabels") || 999;
     let minOffcut = localStorage.getItem("minOffcut") || 1000;
     let useUnlimitedStock = localStorage.getItem("useUnlimitedStock") || false;
+    let groupUniqueNests = localStorage.getItem("groupUniqueNests") || false;
+    let unlimitedStockLength = localStorage.getItem("unlimitedStockLength") || 12000;
 
     document.getElementById('grip-start').value = gripStart;
     document.getElementById('grip-end').value = gripEnd;
@@ -838,6 +856,8 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('max-unique-labels').value = maxUniqueLabels;
     document.getElementById('min-offcut').value = minOffcut;
     document.getElementById('unlimited-stock-preference').checked = useUnlimitedStock == 'true';
+    document.getElementById('group-unique-nests').checked = groupUniqueNests == 'true';
+    document.getElementById('unlimited-stock-length').value = unlimitedStockLength;
 });
 
 let cuttingNests = [];
@@ -846,18 +866,53 @@ function optimizeCuttingNests() {
     // Unlimited stock setting
     const useUnlimitedStock = document.getElementById('unlimited-stock-preference').checked;
 
-    if ((stockItems.length === 0 || pieceItems.length === 0) && !useUnlimitedStock) {
-        M.toast({html: 'Please add stock and piece items first!', classes: 'rounded toast-warning', displayLength: 2000});
+    if (stockItems.length === 0 && !useUnlimitedStock) {
+        M.toast({html: 'Please add stock items first!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    if (pieceItems.length === 0) {
+        M.toast({html: 'Please add piece items first!', classes: 'rounded toast-warning', displayLength: 2000});
         return;
     }
 
-    const gripStart = parseFloat(document.getElementById('grip-start').value);
-    const gripEnd = parseFloat(document.getElementById('grip-end').value);
-    const sawWidth = parseFloat(document.getElementById('saw-width').value);
+    const gripStart = (() => {
+    const val = parseFloat(document.getElementById('grip-start').value);
+        return isNaN(val) ? 0 : val;
+    })();
+
+    const gripEnd = (() => {
+        const val = parseFloat(document.getElementById('grip-end').value);
+        return isNaN(val) ? 0 : val;
+    })();
+
+    const sawWidth = (() => {
+        const val = parseFloat(document.getElementById('saw-width').value);
+        return isNaN(val) ? 0 : val;
+    })();
+
     const preferShorterStocks = document.getElementById('shorter-length-preference').checked;
-    const maxUniqueLabels = parseInt(document.getElementById('max-unique-labels').value);
-    const minOffcut = parseInt(document.getElementById('min-offcut').value);
-    nestCounter = Number(document.getElementById('first-nest-number').value);
+
+    const maxUniqueLabels = (() => {
+        const val = parseInt(document.getElementById('max-unique-labels').value);
+        return isNaN(val) ? 999 : val;
+    })();
+
+    const minOffcut = (() => {
+        const val = parseInt(document.getElementById('min-offcut').value);
+        return isNaN(val) ? 0 : val;
+    })();
+
+    nestCounter = (() => {
+        const val = Number(document.getElementById('first-nest-number').value);
+        return isNaN(val) ? 1 : val;
+    })();
+
+    const groupUniqueNests = document.getElementById('group-unique-nests').checked;
+
+    const unlimitedStockLength = (() => {
+        const val = parseFloat(document.getElementById('unlimited-stock-length').value);
+        return isNaN(val) ? 12000 : val;
+    })();
 
     localStorage.setItem("gripStart", gripStart);
     localStorage.setItem("gripEnd", gripEnd);
@@ -867,6 +922,8 @@ function optimizeCuttingNests() {
     localStorage.setItem("minOffcut", minOffcut);
     localStorage.setItem("first-nest-number", nestCounter);
     localStorage.setItem("useUnlimitedStock", useUnlimitedStock);
+    localStorage.setItem("groupUniqueNests", groupUniqueNests);
+    localStorage.setItem("unlimitedStockLength", unlimitedStockLength);
 
     if(isNaN(nestCounter)) {
         M.toast({html: 'Please Enter Correct First Nest Number!', classes: 'rounded toast-warning', displayLength: 2000});
@@ -908,14 +965,14 @@ function optimizeCuttingNests() {
             for (let i = 0; i < 100; i++) {
                 stockGroups[profile].push({
                     id: `unlimited-stock-${profile}-${i}`,
-                    length: 12000,
+                    length: unlimitedStockLength,
                     originalStock: {
                         profile: profile,
-                        length: 12000,
+                        length: unlimitedStockLength,
                         amount: 'unlimited'
                     },
-                    usableLength: 12000 - gripStart - gripEnd,
-                    remainingLength: 12000 - gripStart - gripEnd,
+                    usableLength: unlimitedStockLength - gripStart - gripEnd,
+                    remainingLength: unlimitedStockLength - gripStart - gripEnd,
                     pieceAssignments: [],
                     offcut: 0,
                     waste: 0,
@@ -972,7 +1029,7 @@ function optimizeCuttingNests() {
         }
 
         if (useUnlimitedStock) {
-            binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gripEnd, sawWidth, maxUniqueLabels, profile, stockGroups);
+            binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gripEnd, sawWidth, maxUniqueLabels, profile, stockGroups, unlimitedStockLength);
         } else {
             binPackingOptimization(pieces, stocks, gripStart, gripEnd, sawWidth, maxUniqueLabels);
         }
@@ -987,7 +1044,7 @@ function optimizeCuttingNests() {
 }
 
 // Modified version of your binPackingOptimization that handles unlimited stock
-function binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gripEnd, sawWidth, maxUniqueLabels, profile, stockGroups) {
+function binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gripEnd, sawWidth, maxUniqueLabels, profile, stockGroups, unlimitedStockLength) {
     // Sort pieces by length (decreasing)
     pieces.sort((a, b) => b.length - a.length);
     
@@ -1003,14 +1060,14 @@ function binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gri
             for (let i = 0; i < 20; i++) {
                 const newStock = {
                     id: `unlimited-stock-${profile}-${currentCount + i}`,
-                    length: 12000,
+                    length: unlimitedStockLength,
                     originalStock: {
                         profile: profile,
-                        length: 12000,
+                        length: unlimitedStockLength,
                         amount: 'unlimited'
                     },
-                    usableLength: 12000 - gripStart - gripEnd,
-                    remainingLength: 12000 - gripStart - gripEnd,
+                    usableLength: unlimitedStockLength - gripStart - gripEnd,
+                    remainingLength: unlimitedStockLength - gripStart - gripEnd,
                     pieceAssignments: [],
                     offcut: 0,
                     waste: 0,
@@ -1050,9 +1107,9 @@ function binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gri
         const bestPattern = findBestPatternForStock(unassignedPieces, stockUsableLength, sawWidth, maxUniqueLabels);
         
         if (bestPattern.pieces.length === 0) {
-            // No pieces fit in this stock - this shouldn't happen with 12000mm stock unless pieces are too long
+            // No pieces fit in this stock
             currentStock.used = false;
-            M.toast({html: `Some pieces are too long for 12000mm stock!`, classes: 'rounded toast-warning', displayLength: 2000});
+            M.toast({html: `Some pieces are too long for ${unlimitedStockLength}mm stock!`, classes: 'rounded toast-warning', displayLength: 2000});
             break;
         }
         
@@ -1172,8 +1229,7 @@ function binPackingOptimization(pieces, stocks, gripStart, gripEnd, sawWidth, ma
         });
         
         // Update remaining length
-        currentStock.remainingLength = currentStock.usableLength - 
-            (currentPos - gripStart);
+        currentStock.remainingLength = currentStock.usableLength - (currentPos - gripStart);
     }
 }
 
@@ -1866,12 +1922,13 @@ function renderCuttingNests(nests) {
     // Create a standard HTML checkbox (not using Materialize's styling)
     const checkboxInput = document.createElement('input');
     checkboxInput.type = 'checkbox';
-    checkboxInput.id = 'export-option';
+    checkboxInput.id = 'remove-nesting-color';
 
     // Create a label for the checkbox
     const checkboxLabel = document.createElement('label');
-    checkboxLabel.htmlFor = 'export-option';
+    checkboxLabel.htmlFor = 'remove-nesting-color';
     checkboxLabel.textContent = 'Remove nesting color';
+    checkboxLabel.style.color = 'black';
 
     // Assemble the checkbox and label
     checkboxContainer.appendChild(checkboxInput);
@@ -2007,7 +2064,7 @@ function generatePDF(uniqueNests) {
         // Draw nest visualization
         const barHeight = 10;
         const barY = yPosition;
-        const isBlackAndWhite = document.getElementById('export-option').checked;
+        const isBlackAndWhite = document.getElementById('remove-nesting-color').checked;
 
         // Draw stock bar
         doc.setDrawColor(200, 200, 200);
@@ -2540,6 +2597,8 @@ document.addEventListener('DOMContentLoaded', function(){
 function getUniqueNests(nests) {
     const nestMap = new Map();
 
+    const groupUniqueNests = document.getElementById('group-unique-nests').checked; // Get the checkbox value
+
     // Helper function to create unique key for nest
     function createNestKey(nest) {
         const sortedPieces = nest.pieceAssignments.map(item => ({
@@ -2553,7 +2612,8 @@ function getUniqueNests(nests) {
         return JSON.stringify({
             profile: nest.profile,
             length: nest.stockLength,
-            pieceAssignments: sortedPieces
+            pieceAssignments: sortedPieces,
+            groupUniqueNests: groupUniqueNests == true ? "" : Math.random()
         });
     }
 
