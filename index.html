@@ -180,11 +180,26 @@
                             <option value="T">T</option>
                         </select>
                         <label>Section Type Select</label>
-                        <div class="input-group">
-                            <span class="helper-text">Section details:</span>
-                            <input id="sectionTypeInput" type="text" class="compact-input">
-                        </div>
                     </div>
+                    
+                    <div class="profile-input-container" style="margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                            <div class="input-field" style="flex: 1; margin-bottom: 0;">
+                                <i class="material-icons prefix">search</i>
+                                <input type="text" id="sectionDetailsAutocomplete" class="autocomplete" disabled>
+                                <label for="sectionDetailsAutocomplete">Section Details</label>
+                            </div>
+                            <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" 
+                            id="sectionDetailsDropdownBtn" data-target="sectionDetailsDropdown" 
+                            style="margin-bottom: 0.5rem;">
+                                <i class="material-icons">arrow_drop_down</i>
+                            </a>
+                        </div>
+                        <ul id='sectionDetailsDropdown' class='dropdown-content dropDownLimitHeight'>
+                            <li><a class="deep-purple-text">Please select a section type first!</a></li>
+                        </ul>
+                    </div>
+                    
                     <div class="row input-columns">
                         <div class="col s12 m4 l4">
                             <div class="input-group">
@@ -267,6 +282,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <input type="file" id="csvUploadInput" accept=".csv" style="display: none;">
+                    <a href="#" class="btn waves-effect modal-trigger">Batch from CSV</a>
                     <a href='#' class="btn waves-effect modal-trigger" onclick="createNC()">Create</a>
                     <a href='#' class="btn waves-effect modal-trigger" onclick="downloadNC()">Download</a>
                     <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
@@ -664,6 +681,7 @@
         <!--Includes js file for jszip-->
         <script src="Scripts/jszip.min.js"></script>
         <!--Custom js files-->
+        <script src="Scripts/batch-nc-from-csv.js"></script>
         <script src="Scripts/dxf-to-nc.js"></script>
         <script src="Scripts/nc-file-creator.js"></script>
         <script src="Scripts/nc-to-fnc.js"></script>

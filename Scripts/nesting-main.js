@@ -414,13 +414,16 @@ document.addEventListener('DOMContentLoaded', function(){
         selectedFile = sessionStorage.getItem('selectedFile');
         selectFile(selectedFile); //Select saved selectedFile in session
     }
-    // Addd pieces from loaded files to nesting
+    // Load saved stock
+    stockItems = JSON.parse(localStorage.getItem('stockItems')) || [];
+    renderStockTable();
+    // Add pieces from loaded files to nesting
     const addPieceBtn = document.getElementById('add-piece');
     for (const [fileName, fileData] of filePairs) {
         selectFile(fileName);
         if(profileCode.replace(/\s+/g, '').toUpperCase() == 'B') continue; // Skip if profile is plate
         addPieceBtn.click(); // Simulate click to add piece
-      }
+    }
 });
 
 document.addEventListener('keydown', function (e) {
@@ -478,12 +481,103 @@ const pieceTable = document.getElementById('piece-table').getElementsByTagName('
 const cuttingNestsDiv = document.getElementById('cutting-nests');
 const remainingPiecesDiv = document.getElementById('remaining-pieces');
 const downloadOffcutsBtn = document.getElementById('download-offcuts-btn');
+const acceptNestBtn = document.getElementById('accept-nest-btn');
 
 // Event Listeners
 addStockBtn.addEventListener('click', addStock);
 addPieceBtn.addEventListener('click', addPiece);
 optimizeBtn.addEventListener('click', optimizeCuttingNests);
 downloadOffcutsBtn.addEventListener('click', downloadOffcutCSV);
+acceptNestBtn.addEventListener('click', () => {
+    const modal = document.getElementById('acceptNestModal');
+    const instance = M.Modal.init(modal);
+    instance.open();
+});
+
+// Function to process accepted nests
+function acceptNest() {
+    if (cuttingNests.length === 0) {
+        M.toast({html: 'No nests to accept!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+
+    // Check for unlimited stock mode
+    if (localStorage.getItem('useUnlimitedStock') === 'true') {
+        M.toast({html: 'Cannot Accept Nest in Unlimited Stock Mode!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
+
+    // Track offcuts to add
+    const offcutsToAdd = [];
+
+    // Track used stock to remove
+    const usedStock = [];
+
+    // Process each nest
+    cuttingNests.forEach(nest => {
+        // Add used stock to removal list
+        usedStock.push({
+            profile: nest.profile,
+            length: nest.stockLength,
+            amount: 1
+        });
+        
+        // Check if offcut already in list
+        const existingOffcutIndex = offcutsToAdd.findIndex(
+            item => item.profile === nest.profile && item.length === nest.offcut
+        );
+        
+        if (existingOffcutIndex !== -1) {
+            offcutsToAdd[existingOffcutIndex].amount += 1;
+        } else if (nest.offcut > 0) {
+            offcutsToAdd.push({
+                profile: nest.profile,
+                length: nest.offcut,
+                amount: 1
+            });
+        }
+    });
+
+    // Remove used stock
+    usedStock.forEach(used => {
+        const existingStockIndex = stockItems.findIndex(
+            item => item.profile === used.profile && item.length === used.length
+        );
+        
+        if (existingStockIndex !== -1) {
+            // Reduce the amount of the stock item
+            stockItems[existingStockIndex].amount -= used.amount;
+            
+            // If amount becomes zero or negative, remove the stock item
+            if (stockItems[existingStockIndex].amount <= 0) {
+                stockItems.splice(existingStockIndex, 1);
+            }
+        }
+    });
+
+    // Add offcuts as new stock items
+    offcutsToAdd.forEach(offcut => {
+        const existingStockIndex = stockItems.findIndex(
+            item => item.profile === offcut.profile && item.length === offcut.length
+        );
+        
+        if (existingStockIndex !== -1) {
+            // Update existing stock item
+            stockItems[existingStockIndex].amount += offcut.amount;
+        } else {
+            // Add new stock item
+            stockItems.push({
+                profile: offcut.profile,
+                length: offcut.length,
+                amount: offcut.amount
+            });
+        }
+    });
+
+    // Update the stock table
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
+    renderStockTable();
+}
   
 // Function to programmatically set input value
 function setInputValue(inputId, value) {
@@ -506,6 +600,7 @@ function addStock() {
 
     const stockItem = { profile, length, amount };
     stockItems.push(stockItem);
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
     renderStockTable();
 
     // Clear inputs
@@ -576,6 +671,7 @@ function editStock(index) {
     // Update the add event listener to handle updates
     addStockBtn.removeEventListener('click', addStock);
     addStockBtn.addEventListener('click', updateStock);
+    M.updateTextFields();
 }
 
 function updateStock() {
@@ -603,6 +699,7 @@ function updateStock() {
     resetStockForm();
     
     // Re-render the table
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
     renderStockTable();
     
     M.toast({html: 'Stock updated successfully!', classes: 'rounded toast-success', displayLength: 2000});
@@ -682,6 +779,7 @@ function editPiece(index) {
     // Update the add event listener to handle updates
     addPieceBtn.removeEventListener('click', addPiece);
     addPieceBtn.addEventListener('click', updatePiece);
+    M.updateTextFields();
 }
 
 function updatePiece() {
@@ -830,6 +928,7 @@ function renderPieceTable() {
 
 function removeStock(index) {
     stockItems.splice(index, 1);
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
     renderStockTable();
 }
 
@@ -971,8 +1070,8 @@ function optimizeCuttingNests() {
                         length: unlimitedStockLength,
                         amount: 'unlimited'
                     },
-                    usableLength: unlimitedStockLength - gripStart - gripEnd,
-                    remainingLength: unlimitedStockLength - gripStart - gripEnd,
+                    usableLength: unlimitedStockLength - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
+                    remainingLength: unlimitedStockLength - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
                     pieceAssignments: [],
                     offcut: 0,
                     waste: 0,
@@ -992,8 +1091,8 @@ function optimizeCuttingNests() {
                     id: `stock-${stock.profile}-${i}`,
                     length: stock.length,
                     originalStock: stock,
-                    usableLength: stock.length - gripStart - gripEnd,
-                    remainingLength: stock.length - gripStart - gripEnd,
+                    usableLength: stock.length - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
+                    remainingLength: stock.length - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
                     pieceAssignments: [],
                     offcut: 0,
                     waste: 0,
@@ -1041,6 +1140,7 @@ function optimizeCuttingNests() {
     renderCuttingNests(cuttingNests);
     cuttingNestsDiv.classList.remove('hide');
     downloadOffcutsBtn.classList.remove('hide');
+    acceptNestBtn.classList.remove('hide');
     M.Tabs.init(document.querySelectorAll('#nesting-tabs')); // Initialize tabs
 }
 
@@ -1067,8 +1167,8 @@ function binPackingOptimizationWithUnlimitedStock(pieces, stocks, gripStart, gri
                         length: unlimitedStockLength,
                         amount: 'unlimited'
                     },
-                    usableLength: unlimitedStockLength - gripStart - gripEnd,
-                    remainingLength: unlimitedStockLength - gripStart - gripEnd,
+                    usableLength: unlimitedStockLength - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
+                    remainingLength: unlimitedStockLength - gripStart - gripEnd - (gripStart === 0 ? 0 : sawWidth),
                     pieceAssignments: [],
                     offcut: 0,
                     waste: 0,
@@ -1359,7 +1459,7 @@ function processStockResults(stocks, cuttingNests, gripStart, gripEnd, sawWidth)
         if (stock.used && stock.pieceAssignments.length > 0) {
             // Calculate total used length
             let usedLength = 0;
-            let sawCuts = 0;
+            let sawCuts = gripStart === 0 ? 0 : 1;
             
             stock.pieceAssignments.forEach((assignment, index) => {
                 usedLength += assignment.length;
@@ -1514,6 +1614,18 @@ function renderCuttingNests(nests) {
         pattern.pieceAssignments.forEach((assign, i) => {
             const pieceWidth = assign.piece.length / total * 100;
             
+            // Add saw cut
+            if (i == 0 && pattern.sawWidth > 0 && pattern.gripStart != 0) {
+                if (pattern.pieceAssignments[i].withoutSawWidth) return;
+                const sawCut = createElem('div', 'saw-cut-segment');
+                sawCut.style.left = `${(cursor / total * 100)}%`;
+                sawCut.style.width = `${(pattern.sawWidth / total * 100)}%`;
+                sawCut.setAttribute('data-tooltip', `Saw Cut: ${pattern.sawWidth}mm`);
+                sawCut.classList.add('tooltipped');
+                stockBar.appendChild(sawCut);
+                cursor += pattern.sawWidth;
+            }
+
             // Create piece segment
             const pieceSegment = createElem('div', 'piece-segment');
             pieceSegment.style.left = `${(cursor / total * 100)}%`;
@@ -2354,6 +2466,7 @@ function loadStockData(fileData) {
         if (isNaN(length) || isNaN(amount)) continue; // Skip invalid lines
         stockItems.push({ profile, length, amount });
     }
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
     renderStockTable();
     M.toast({html: 'Stock loaded successfully!', classes: 'rounded toast-success', displayLength: 2000});
 }
@@ -2382,6 +2495,7 @@ function clearStock() {
         return;
     }
     stockItems = [];
+    localStorage.setItem('stockItems', JSON.stringify(stockItems));
     renderStockTable();
     M.toast({html: 'Stock cleared successfully!', classes: 'rounded toast-success', displayLength: 2000});
 }
@@ -2650,7 +2764,8 @@ function createNestBlocks(nestCounter, missingPieces) {
         let nestData = `[[BAR]]\n[HEAD]\nN:${nestCounter} `;
         uniqueNest.nest.pieceAssignments.forEach((piece, index) => {
             // If constraint material is set, use it instead of pieceSteelQuality
-            const material = constraintMaterial == '' ? pieceItemsFromFiles[piece.label][6] : constraintMaterial;
+            let material = constraintMaterial == '' ? pieceItemsFromFiles[piece.label][6] : constraintMaterial;
+            if (constraintMaterial == undefined) constraintMaterial = 'S235JR'; // Default to S235JR if not set
             // Convert the missing pieces array to a Map for lookup using label
             const missingPiecesByLabel = new Map(
                 missingPieces.map(piece => [piece.label, piece])
