@@ -5,6 +5,11 @@ let filePairs = new Map(Object.entries(JSON.parse(sessionStorage.getItem("filePa
 let selectedFile = sessionStorage.getItem("selectedFile") || "";
 //Blocs
 let blocs = ['BO', 'SI', 'AK', 'IK', 'PU', 'KO', 'SC', 'TO', 'UE', 'PR', 'KA', 'EN']
+// Variables to store profile data for comparison
+let currentProfile = null;
+let previousProfile = null;
+let currentProfileSize = null;
+let previousProfileSize = null;
 
 function updateSessionData() {
     sessionStorage.setItem("filePairs", JSON.stringify(Object.fromEntries(filePairs)));
@@ -447,6 +452,25 @@ function loadProfile(displayText, profileData = null) {
 }
 
 function displayProfile(selectedProfile) {
+    // Store previous profile before updating current
+    if (currentProfile) {
+        previousProfile = currentProfile;
+    }
+    if (!previousProfileSize) {
+        previousProfileSize = document.getElementById('profileSizeAutocomplete').value;
+    }
+    else {
+        previousProfileSize = currentProfileSize;
+    }
+    currentProfileSize = document.getElementById('profileSizeAutocomplete').value;
+    
+    // Store current profile
+    currentProfile = {
+        profile: selectedProfile,
+        profileType: loadedProfile
+    };
+    
+    // Continue with your existing displayProfile logic
     if (loadedProfile == 'I' || loadedProfile == 'U') {
         clearViewProfileData();
         const weight = document.createElement('p');
@@ -470,7 +494,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, height, webHeight, width, webThickness, flangeThickness, radius, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
     else if (loadedProfile == 'Rebar' || loadedProfile == 'Round') {
         clearViewProfileData();
@@ -485,7 +509,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, od, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
     else if (loadedProfile == 'CHS') {
         clearViewProfileData();
@@ -506,7 +530,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, od, thickness, nps, sch, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
     else if (loadedProfile == 'Flat') {
         clearViewProfileData();
@@ -523,7 +547,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, thickness, width, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
     else if (loadedProfile == 'Square') {
         clearViewProfileData();
@@ -538,7 +562,7 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, length, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
     else if (loadedProfile == 'RHS' || loadedProfile == 'SHS' || loadedProfile == 'L') {
         clearViewProfileData();
@@ -557,17 +581,20 @@ function displayProfile(selectedProfile) {
         code.innerHTML = `Code: ${selectedProfile.code}`;
 
         [weight, thickness, height, width, code].forEach(e => { profileData.appendChild(e) });
-        debouncedCalcWeight(); //Calculate weight based on selected profile
+        debouncedCalcWeight();
     }
-    else M.toast({html: 'Please choose a correct profile!', classes: 'rounded toast-error', displayLength: 2000});
+    else {
+        M.toast({html: 'Please choose a correct profile!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
 
-    // Update text fields
     M.updateTextFields();
 }
 
 function clearViewProfileData() {
-    profileData.innerHTML = ''; //Clears content of profile data
-    weightValue = 0; //Clears weight calculation
+    const profileData = document.getElementById('profileData');
+    profileData.innerHTML = '';
+    weightValue = 0;
 }
 
 function parseCSV(text) {
@@ -821,4 +848,294 @@ function findProfileByDisplayText(displayText) {
     return csvData.find(profile => {
         return getProfileID(profile) === displayText;
     });
+}
+
+// Function to generate profile HTML for the modal
+function generateProfileHTML(profileInfo, profileSize, isImage = false) {
+    if (!profileInfo) {
+        return `
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="m21 12-6 0m-6 0-6 0"/>
+                </svg>
+                <p>No profile selected</p>
+            </div>
+        `;
+    }
+    
+    const { profile: selectedProfile, profileType } = profileInfo;
+    const profileWeight = parseFloat(selectedProfile.kgm).toFixed(2);
+    
+    let profileImage = '';
+    if (isImage) {
+        const profileCode = selectedProfile.code.charAt(0);
+        let imageSrc = 'Images/Profiles/no-profile.png';
+        
+        // Determine profile image based on type
+        switch (profileType) {
+            case 'I': imageSrc = 'Images/Profiles/I.png'; break;
+            case 'U': imageSrc = 'Images/Profiles/U.png'; break;
+            case 'CHS': imageSrc = 'Images/Profiles/CHS.png'; break;
+            case 'RHS': imageSrc = 'Images/Profiles/RHS.png'; break;
+            case 'SHS': imageSrc = 'Images/Profiles/SHS.png'; break;
+            case 'Flat': imageSrc = 'Images/Profiles/Flat.png'; break;
+            case 'Round': imageSrc = 'Images/Profiles/Round.png'; break;
+            case 'Square': imageSrc = 'Images/Profiles/Square.png'; break;
+            case 'L': imageSrc = 'Images/Profiles/L.png'; break;
+        }
+        
+        profileImage = `
+            <div class="profile-image">
+                <img src="${imageSrc}" alt="Profile visualization" loading="lazy">
+            </div>
+        `;
+    }
+    
+    const profileName = profileSize.split(":")[1];
+    const specifications = getProfileSpecifications(selectedProfile, profileType);
+    
+    return `
+        <div class="profile-container">
+            <div class="profile-header">
+                <div class="profile-title">
+                    <h3>${profileName}</h3>
+                    <span class="profile-code">${selectedProfile.code}</span>
+                </div>
+                <div class="profile-weight">
+                    <span class="weight-value">${profileWeight}</span>
+                    <span class="weight-unit">kg/m</span>
+                </div>
+            </div>
+            
+            <div class="profile-specs">
+                ${specifications}
+            </div>
+            
+            ${profileImage}
+        </div>
+        
+        <style>
+            .profile-container {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: #ffffff;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                margin: 0;
+            }
+            
+            .profile-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 24px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .profile-title h3 {
+                margin: 0 0 4px 0;
+                font-size: 1.25rem;
+                font-weight: 600;
+            }
+            
+            .profile-code {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+            
+            .profile-weight {
+                text-align: right;
+            }
+            
+            .weight-value {
+                display: block;
+                font-size: 1.5rem;
+                font-weight: 700;
+                line-height: 1;
+            }
+            
+            .weight-unit {
+                font-size: 0.875rem;
+                opacity: 0.9;
+            }
+            
+            .profile-specs {
+                padding: 24px;
+                background: #fafbfc;
+            }
+            
+            .spec-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 16px;
+                margin: 0;
+            }
+            
+            .spec-item {
+                background: white;
+                padding: 16px;
+                border-radius: 8px;
+                border: 1px solid #e1e8ed;
+                transition: all 0.2s ease;
+            }
+            
+            .spec-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+            
+            .spec-label {
+                color: #657786;
+                font-size: 0.875rem;
+                font-weight: 500;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .spec-value {
+                color: #14171a;
+                font-size: 1.125rem;
+                font-weight: 600;
+                margin: 0;
+            }
+            
+            .profile-image {
+                padding: 24px;
+                text-align: center;
+                background: white;
+                border-top: 1px solid #e1e8ed;
+            }
+            
+            .profile-image img {
+                max-width: 100%;
+                height: auto;
+                max-height: 300px;
+                border-radius: 8px;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+                transition: transform 0.3s ease;
+            }
+            
+            .profile-image img:hover {
+                transform: scale(1.02);
+            }
+            
+            .empty-state {
+                text-align: center;
+                padding: 48px 24px;
+                color: #657786;
+            }
+            
+            .empty-state svg {
+                margin-bottom: 16px;
+                opacity: 0.6;
+            }
+            
+            .empty-state p {
+                margin: 0;
+                font-size: 1rem;
+                font-weight: 500;
+            }
+            
+            @media (max-width: 768px) {
+                .profile-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+                
+                .profile-weight {
+                    text-align: left;
+                }
+                
+                .spec-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    `;
+}
+
+// Helper function to generate specifications based on profile type
+function getProfileSpecifications(profile, profileType) {
+    const specs = [];
+    
+    if (profileType === 'I' || profileType === 'U') {
+        specs.push(
+            { label: 'Height', value: `${profile.h} mm` },
+            { label: 'Web Height', value: `${profile.h - 2 * profile.tf} mm` },
+            { label: 'Width', value: `${profile.b} mm` },
+            { label: 'Web Thickness', value: `${profile.tw} mm` },
+            { label: 'Flange Thickness', value: `${profile.tf} mm` },
+            { label: 'Radius', value: `${profile.r} mm` }
+        );
+    }
+    else if (profileType === 'Rebar' || profileType === 'Round') {
+        specs.push(
+            { label: 'Outside Diameter', value: `${profile.od} mm` }
+        );
+    }
+    else if (profileType === 'CHS') {
+        specs.push(
+            { label: 'Outside Diameter', value: `${profile.od} mm` },
+            { label: 'Wall Thickness', value: `${profile.thk} mm` },
+            { label: 'NPS', value: `${profile.nps} inch` },
+            { label: 'Schedule', value: profile.sch }
+        );
+    }
+    else if (profileType === 'Flat') {
+        specs.push(
+            { label: 'Thickness', value: `${profile.thk} mm` },
+            { label: 'Width', value: `${profile.b} mm` }
+        );
+    }
+    else if (profileType === 'Square') {
+        specs.push(
+            { label: 'Side Length', value: `${profile.l} mm` }
+        );
+    }
+    else if (profileType === 'RHS' || profileType === 'SHS' || profileType === 'L') {
+        specs.push(
+            { label: 'Thickness', value: `${profile.thk} mm` },
+            { label: 'Height', value: `${profile.h} mm` },
+            { label: 'Width', value: `${profile.b} mm` }
+        );
+    }
+    
+    return `
+        <div class="spec-grid">
+            ${specs.map(spec => `
+                <div class="spec-item">
+                    <div class="spec-label">${spec.label}</div>
+                    <div class="spec-value">${spec.value}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Function to open comparison modal
+function openComparisonModal() {
+    if (!currentProfile) {
+        M.toast({html: 'Please select a profile first!', classes: 'rounded toast-warning', displayLength: 2000});
+        return;
+    }
+    
+    // Generate HTML for both profiles
+    const currentHTML = generateProfileHTML(currentProfile, currentProfileSize, true);
+    const previousHTML = generateProfileHTML(previousProfile, previousProfileSize, true);
+    
+    // Update modal content
+    document.getElementById('currentProfileContent').innerHTML = currentHTML;
+    document.getElementById('previousProfileContent').innerHTML = previousHTML;
+    
+    // Open modal
+    const modal = M.Modal.getInstance(document.getElementById('profileComparisonModal'));
+    modal.open();
 }

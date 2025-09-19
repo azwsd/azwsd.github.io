@@ -252,6 +252,10 @@ document.addEventListener('keydown', function (e) {
         M.Modal.getInstance(document.getElementById('addHoleModal')).isOpen ||
         M.Modal.getInstance(document.getElementById('dxfToNCModal')).isOpen ||
         M.Modal.getInstance(document.getElementById('FNCModal')).isOpen) return; //Ignore key events if modals are open
+
+    if (document.activeElement.id ==="fileSearch") {
+        return; // ignore key events while typing in search
+    }
         
     if (e.ctrlKey && e.key.toLowerCase() === 's') { //Detect Ctrl + S
         e.preventDefault(); //Prevent default browser save behavior
@@ -661,7 +665,6 @@ function loadDstvSectionDetails(sectionType) {
                 break;
             case 'T':
                 // T sections don't have a standard profile library
-                sectionDetailsElem.disabled = true;
                 const dropdown = document.getElementById('sectionDetailsDropdown');
                 dropdown.innerHTML = '<li><a class="deep-purple-text">T sections not available in profile library</a></li>';
                 resolve();

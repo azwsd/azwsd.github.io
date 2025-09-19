@@ -216,7 +216,7 @@ function getNC() {
         getInputValue('positionInput'),
         getInputValue('gradeInput'),
         getInputValue('quantityInput'),
-        getInputValue('sectionDetailsAutocomplete'),
+        (getInputValue('sectionDetailsAutocomplete').replace(/\s/g, '').split(':')[1] || getInputValue('sectionDetailsAutocomplete').replace(/\s/g, '')),
         getInputValue('sectionTypeSelect'),
         getInputValue('lengthInput'),
         getInputValue('heighthInput'),
@@ -261,4 +261,5 @@ function createNC() {
     const ncData = getNC();
     if(ncData === '') return;
     addFile(fileName, ncData, 1, false);
+    filesPlaceHolder(); // Update file placeholder
 }

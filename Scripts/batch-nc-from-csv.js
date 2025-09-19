@@ -203,6 +203,7 @@ class CSVBatchDSTVCreator {
             }
         }
 
+        filesPlaceHolder(); // Update file placeholder
         // Show completion summary
         const summary = `Batch processing complete. Success: ${successCount}, Errors: ${errorCount}`;
         this.showToast(summary, errorCount === 0 ? 'success' : 'error');
@@ -227,7 +228,7 @@ class CSVBatchDSTVCreator {
     async createDSTVFromRow(row) {
         try {
             // Validate required fields
-            const requiredFields = ['order', 'drawing', 'phase', 'position', 'grade', 'quantity', 'section_type', 'section_details'];
+            const requiredFields = ['order', 'drawing', 'phase', 'position', 'grade', 'quantity', 'length', 'section_type', 'section_details'];
             for (const field of requiredFields) {
                 if (!row[field]) {
                     const error = `Missing required field: ${field}`;
@@ -379,15 +380,15 @@ class CSVBatchDSTVCreator {
         const data = [
             'ST',
             `** Created by OpenSteel on ${new Date().toLocaleDateString()}`,
-            row.order || '',
-            row.drawing || '',
-            row.phase || '',
-            row.position || '',
-            row.grade || '',
-            row.quantity || '1',
-            row.section_details || '',
+            row.order,
+            row.drawing,
+            row.phase,
+            row.position,
+            row.grade,
+            row.quantity,
+            (row.section_details.replace(/\s/g, '').split(':')[1] || row.section_details.replace(/\s/g, '')),
             sectionType,
-            row.length || '0',
+            row.length,
             (sectionType === 'RO' || sectionType === 'RU') ? this.getProfileValue(profileMatch, 'od') : this.getProfileValue(profileMatch, 'h') || '0',
             (sectionType === 'RO' || sectionType === 'RU') ? this.getProfileValue(profileMatch, 'od') : this.getProfileValue(profileMatch, 'b') || '0',
             (sectionType === 'RO' || sectionType === 'RU' || sectionType === 'L') ? this.getProfileValue(profileMatch, 'thk') : this.getProfileValue(profileMatch, 'tf') || '0',
@@ -425,4 +426,18 @@ if (document.readyState === 'loading') {
     });
 } else {
     csvBatchCreator = new CSVBatchDSTVCreator();
+}
+
+function downloadBatchCsvSample() {
+    const sampleCsvContent = `order, drawing, phase, position, grade, quantity, length, web_start_cut, web_end_cut, flange_start_cut, flange_end_cut, section_type, section_details
+Order1,Drawing1,Phase1,Pos1,S235,1,1000,0,0,0,0,L,200X200X15`
+    const blob = new Blob([sampleCsvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_batch.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
