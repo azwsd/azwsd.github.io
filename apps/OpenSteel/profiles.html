@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>OpenSteel</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--Include materialize and its fonts-->
+    <link rel="stylesheet" href="Styles/materialize-main.css">
+    <link rel="stylesheet" href="Styles/materialize-icons.css">
+    <!--include main style sheet-->
+    <link rel="stylesheet" href="Styles/main.css">
+    <link rel="icon" href="Images/favicon.png" type="image/x-icon">
+</head>
+<body>
+    <!-- fixed navigation bar-->     
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper deep-purple darken-4">
+                <ul class="left hide-on-med-and-down">
+                    <li><a href="#!" data-target="clearAllModal" class="waves-effect modal-trigger float-left">Clear all</a></li>
+                    <li><a href="#!" class="waves-effect float-left" onclick="loadIndexPage()">DSTV Viewer</a></li>
+                    <li><a href="#" onclick="loadNestingPage()" class="waves-effect float-left">Linear nesting</a></li>
+                </ul>
+                <div id="logo">OpenSteel</div>
+                <a href="#" data-target="mobile" class="sidenav-trigger"><i class="material-icons">menu</i></a>
+                <ul class="right hide-on-med-and-down">
+                    <li><a href='#' class="waves-effect" id="fullscreenBtn"><i class="material-icons">fullscreen</i></a></li>
+                    <li><a href="#about-me" data-target="aboutMeModal" class="waves-effect modal-trigger">About me</a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    <!--About me modal-->
+    <div id="aboutMeModal" class="modal">
+        <div class="modal-content">
+            <h4>Welcome to OpenSteel</h4>
+            <p>An open-source project crafted with care by <b>Ahmed Mohamed Ragab</b>.</p>
+            <p>OpenSteel is designed to simplify the workflow of professionals in steel detailing, CNC machining, and structural steel fabrication by providing an intuitive interface to view and explore <b>DSTV (.nc/.nc1)</b> files.</p>
+            <p>In addition to NC file visualization, OpenSteel includes a comprehensive <b>Steel Profile Library</b>, allowing you to browse and reference standard steel sections with ease.</p>
+            <p>OpenSteel also performs <b>linear nesting</b> from user input and/or loaded DSTV files, optimizing material usage for your fabrication projects.</p>
+            <p>Whether you're inspecting part geometry, working with steel profiles, or optimizing material utilization through nesting, OpenSteel brings clarity and convenience to your everyday tasks.</p>
+            <a href="https://www.linkedin.com/in/ahmedmora" class="waves-effect linkedin-link" target="_blank">
+                <svg class="linkedin" width="2rem" height="2rem" viewBox="0 0 24 24" fill="currentColor"><path fill="#0A66C2" d="M12.225 12.225h-1.778V9.44c0-.664-.012-1.519-.925-1.519-.926 0-1.068.724-1.068 1.47v2.834H6.676V6.498h1.707v.783h.024c.348-.594.996-.95 1.684-.925 1.802 0 2.135 1.185 2.135 2.728l-.001 3.14zM4.67 5.715a1.037 1.037 0 01-1.032-1.031c0-.566.466-1.032 1.032-1.032.566 0 1.031.466 1.032 1.032 0 .566-.466 1.032-1.032 1.032zm.889 6.51h-1.78V6.498h1.78v5.727zM13.11 2H2.885A.88.88 0 002 2.866v10.268a.88.88 0 00.885.866h10.226a.882.882 0 00.889-.866V2.865a.88.88 0 00-.889-.864z"/></svg>
+                LinkedIn Profile
+            </a>
+            <div class="modal-footer">
+                <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
+            </div>
+        </div>
+    </div>
+    <!--Clear all modal-->
+    <div id="clearAllModal" class="modal">
+        <div class="modal-content">
+          <h4>CLEAR ALL FILES!</h4>
+          <p><b>Are you sure you want to clear all files?</b></p>
+          <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-red btn red" onclick="clearAllFiles()">Yes</a>
+            <a href="#!" class="modal-close waves-effect waves-red btn green">No</a>
+          </div>
+        </div>
+    </div>  
+    <!-- Profile Comparison Modal -->
+    <div id="profileComparisonModal" class="modal modal-fixed-footer" style="width: 80%; max-width: 1000px;">
+        <div class="modal-content">
+            <h4 style="text-align: center; color: #311b92; margin-bottom: 30px;">
+                <i class="material-icons" style="vertical-align: middle;">compare</i>
+                Profile Comparison
+            </h4>
+            
+            <div class="row" style="margin-bottom: 0;">
+                <!-- Current Profile Column -->
+                <div class="col s12 m6">
+                    <div style="border: 2px solid #311b92; border-radius: 8px; padding: 15px; height: 100%; overflow-y: auto;">
+                        <h6 style="text-align: center; color: #311b92; margin-bottom: 15px; font-weight: 600;">
+                            <i class="material-icons tiny" style="vertical-align: middle;">new_releases</i>
+                            Current Selection
+                        </h6>
+                        <div id="currentProfileContent" style="font-size: 0.9rem;">
+                            <!-- Current profile content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Previous Profile Column -->
+                <div class="col s12 m6">
+                    <div style="border: 2px solid #9e9e9e; border-radius: 8px; padding: 15px; height: 100%; overflow-y: auto; background-color: #f5f5f5;">
+                        <h6 style="text-align: center; color: #666; margin-bottom: 15px; font-weight: 600;">
+                            <i class="material-icons tiny" style="vertical-align: middle;">history</i>
+                            Previous Selection
+                        </h6>
+                        <div id="previousProfileContent" style="font-size: 0.9rem;">
+                            <!-- Previous profile content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-deep-purple btn-flat">Close</a>
+        </div>
+    </div>
+    <!--Mobile navbar-->
+    <ul class="sidenav" id="mobile">
+        <li><p class="fileTracker">File 0/0</p></li>
+        <div class="file-search-container">
+            <div class="input-field">
+                <input id="fileSearch" type="text" class="white-text" placeholder="Search files...">
+                <label for="fileSearch" class="white-text">
+                </label>
+            </div>
+        </div>
+        <li><p class="filesPlaceHolder">
+            Insert files with 
+            <span class="sidenav-close deep-purple-text lighten-3" 
+                style="cursor: pointer;"
+                onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open();">
+                insert button
+            </span>, or using drag and drop.
+        </p></li>
+        <li id="sideNavClearAll"><a href="#!" data-target="clearAllModal" class="waves-effect modal-trigger float-left">Clear all</a></li>
+        <ul class="sideNavBottom">
+            <li><a href="#!" class="waves-effect float-left" onclick="loadIndexPage()">DSTV Viewer</a></li>
+            <li><a href="#" onclick="loadNestingPage()" class="waves-effect float-left">Linear nesting</a></li>
+            <li><a href="https://www.linkedin.com/in/ahmedmora" class="waves-effect float-left" target="_blank">LinkedIn Profile</a></li>
+            <li><a href="#about-me" data-target="aboutMeModal" class="sidenav-close modal-trigger float-left">About me</a></li>
+        </ul>
+    </ul>
+
+    <main>
+        <div class="row">
+            <!-- Files Section -->
+            <div class="col l2 hide-on-med-and-down deep-purple lighten-2" id="files">
+                <p class="fileTracker">File 0/0</p>
+                <div class="file-search-container">
+                    <div class="input-field">
+                        <input id="fileSearch" type="text" class="white-text" placeholder="Search files...">
+                        <label for="fileSearch" class="white-text">
+                        </label>
+                    </div>
+                </div>
+                <p class="filesPlaceHolder">
+                    Insert files with 
+                    <span class="white-text lighten-3" 
+                        style="cursor: pointer;"
+                        onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open()">
+                        insert button
+                    </span>, or using drag and drop.
+                </p>
+            </div>
+           <div class="col l8 s12" id="profileDiv">
+                <div id="profileContentDiv">
+                    <!-- Profile Selection Panel -->
+                    <div class="profile-panel">
+                        <div id="ProfileSelection">
+                            <h6 style="margin-bottom: 1rem; color: #311b92; font-weight: 600; text-align: center;">
+                                <i class="material-icons" style="vertical-align: middle;">build</i>
+                                Profile Selection
+                            </h6>
+                            
+                            <!-- Profile Type with Autocomplete + Dropdown -->
+                            <div class="profile-input-container" style="margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                                    <div class="input-field" style="flex: 1; margin-bottom: 0;">
+                                        <i class="material-icons prefix">search</i>
+                                        <input type="text" id="profileTypeAutocomplete" class="autocomplete">
+                                        <label for="profileTypeAutocomplete">Profile Type</label>
+                                    </div>
+                                    <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" 
+                                    id="profileDropdownBtn" data-target="profileDropdown" 
+                                    style="margin-bottom: 0.5rem;">
+                                        <i class="material-icons">arrow_drop_down</i>
+                                    </a>
+                                </div>
+                                <ul id='profileDropdown' class='dropdown-content dropDownLimitHeight'></ul>
+                            </div>
+
+                            <!-- Profile Size with Autocomplete + Dropdown -->
+                            <div class="profile-input-container" style="margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                                    <div class="input-field" style="flex: 1; margin-bottom: 0;">
+                                        <i class="material-icons prefix">straighten</i>
+                                        <input type="text" id="profileSizeAutocomplete" class="autocomplete" disabled>
+                                        <label for="profileSizeAutocomplete">Profile Size</label>
+                                    </div>
+                                    <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" 
+                                    id="profileSizeDropdownBtn" data-target="profileSizeDropdown" 
+                                    style="margin-bottom: 0.5rem;">
+                                        <i class="material-icons">arrow_drop_down</i>
+                                    </a>
+                                </div>
+                                <ul id='profileSizeDropdown' class='dropdown-content dropDownLimitHeight'>
+                                    <li><a class="deep-purple-text">Pl"ease select a profile type first!</a></li>
+                                </ul>
+                            </div>
+
+                            <!-- Comparison Button -->
+                            <a class="waves-effect waves-light btn-small deep-purple" onclick="openComparisonModal()">
+                                <i class="material-icons tooltipped" data-position="left" data-tooltip="Compare Profiles">compare</i>
+                                Compare
+                            </a>
+                        </div>
+                        
+                        <!-- Profile Data Display -->
+                        <div id="profileData">
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9e9e9e; font-style: italic; text-align: center;">
+                                <div>
+                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Select a profile and size to view details</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Profile Image Display -->
+                    <div class="profile-panel" id="profileImage">
+                        <div style="text-align: center;">
+                            <img src="Images/Profiles/no-profile.png" alt="Profile visualization" 
+                                style="border: 2px dashed #e0e0e0; border-radius: 8px; padding: 1rem;">
+                            <p style="margin-top: 1rem; color: #666; font-size: 0.8rem; font-style: italic;">
+                                Profile visualization will appear here
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Weight Calculator Panel -->
+                    <div class="profile-panel" id="weightCalc">
+                        <h6 style="margin-bottom: 1rem; color: #311b92; font-weight: 600; text-align: center;">
+                            <i class="material-icons" style="vertical-align: middle;">calculate</i>
+                            Weight Calculator
+                        </h6>
+                        
+                        <div class="input-group">
+                            <input type="number" placeholder="Enter length" id="Length" min="0" step="0.1">
+                            <p>mm</p>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="number" placeholder="Enter quantity" id="Quantity" min="1" step="1" value="1">
+                            <p>pieces</p>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="text" placeholder="Total weight" id="weightResult" disabled>
+                            <p>kg</p>
+                        </div>
+                        
+                        <div style="margin-top: 1rem; padding: 0.8rem; background: #f8f9ff; border-radius: 6px; border-left: 4px solid #311b92;">
+                            <p style="margin: 0; font-size: 0.8rem; color: #666; text-align: center;">
+                                <i class="material-icons tiny" style="vertical-align: middle;">info</i>
+                                Some calculations are approximate values
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Properties Panel -->
+            <div class="col l2 m12 s12 deep-purple lighten-2" id="properties">
+                <ul class="tabs">
+                    <li class="tab col s12"><a href="#tab1" class="active deep-purple lighten-2">Properties</a></li>
+                </ul>
+                <div id="tab1" class="tab-content">
+                    <div id="Project"><h5>Project:</h5><p>N/A</p></div>
+                    <div id="Drawing"><h5>Drawing:</h5><p>N/A</p></div>
+                    <div id="Phase"><h5>Phase:</h5><p>N/A</p></div>
+                    <div id="Piece"><h5>Piece:</h5><p>N/A</p></div>
+                    <div id="Grade"><h5>Grade:</h5><p>N/A</p></div>
+                    <div id="Quantity"><h5>Quantity:</h5><p>N/A</p></div>
+                    <div id="Profile"><h5>Profile:</h5><p>N/A</p></div>
+                    <div id="Code"><h5>Profile code:</h5><p>N/A</p></div>
+                    <div id="Length"><h5>Length:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="Height"><h5>Height:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="flangeWidth"><h5>Flange width:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="flangeThickness"><h5>Flange thickness:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="webThickness"><h5>Web thichness:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="Radius"><h5>Radius:</h5><p>N/A</p><p> mm</p></div>
+                    <div id="weight"><h5>Weight by meter:</h5><p>N/A</p><p> kg/m</p></div>
+                    <div id="Surface"><h5>Painting surface by meter:</h5><p>N/A</p><p> m2/m</p></div>
+                    <div id="webCutStart"><h5>Web start cut:</h5><p>N/A</p><p> degrees</p></div>
+                    <div id="webCutEnd"><h5>Web end cut:</h5><p>N/A</p><p> degrees</p></div>
+                    <div id="flangeCutStart"><h5>Flange start cut:</h5><p>N/A</p><p> degrees</p></div>
+                    <div id="flangeCutEnd"><h5>Flange end cut:</h5><p>N/A</p><p> degrees</p></div>
+                    <div id="textInfo1"><h5>Text info:</h5><p>N/A</p></div>
+                    <div id="textInfo2"><h5>Text info:</h5><p>N/A</p></div>
+                    <div id="textInfo3"><h5>Text info:</h5><p>N/A</p></div>
+                    <div id="textInfo4"><h5>Text info:</h5><p>N/A</p></div>
+                    <div><img class="materialboxed" id="profileViewsImg" src=""></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed-action-btn">
+        <a class="btn-floating btn-large deep-purple darken-4" id="fileInputBtn">
+            <i class="large material-icons tooltipped" data-position="left" data-tooltip="Insert" onclick="insert_file(this)"><input type="file" hidden id="fileInput" placeholder="File input" directory multiple>insert_drive_file</i>
+        </a>
+    </div>
+
+    <!-- Tap Target Structure -->
+    <div class="tap-target deep-purple darken-4" data-target="fileInputBtn" id="fileInputTapTarget"></div>
+
+    <!--Includes js file for materialize-->
+    <script src="Scripts/materialize-main.js"></script>
+    <script src="Scripts/materialize-scripts.js"></script>
+    <!--Includes main js files for profile page-->
+    <script src="Scripts/profiles-csv-loader.js"></script>
+    <script src="Scripts/profiles-main.js"></script>
+    <script src="Scripts/full-screen.js"></script>
+    <script src="Scripts/search-files.js"></script>
+</body>
+</html>

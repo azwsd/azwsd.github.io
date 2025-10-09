@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>OpenSteel</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!--Include materialize and its fonts-->
+        <link rel="stylesheet" href="Styles/materialize-main.css">
+        <link rel="stylesheet" href="Styles/materialize-icons.css">
+        <!--include main style sheet-->
+        <link rel="stylesheet" href="Styles/main.css">
+        <link rel="icon" href="Images/favicon.png" type="image/x-icon">
+    </head>
+    <body>
+        <!-- fixed navigation bar-->     
+        <div class="navbar-fixed">
+            <nav>
+                <div class="nav-wrapper deep-purple darken-4">
+                    <ul class="left hide-on-med-and-down">
+                        <li><a href="#!" data-target="clearAllModal" class="waves-effect modal-trigger float-left">Clear all</a></li>
+                        <li><a href="#" onclick="loadProfilesPage()" class="waves-effect float-left">Profiles library</a></li>
+                        <li><a href="#" onclick="loadNestingPage()" class="waves-effect float-left">Linear nesting</a></li>
+                        <li><a href="#shortcuts" data-target="shortcutsModal" class="waves-effect modal-trigger">Shortcuts</a></li>
+                    </ul>
+                    <div id="logo">OpenSteel</div>
+                    <a href="#" data-target="mobile" class="sidenav-trigger"><i class="material-icons">menu</i></a>
+                    <ul class="right hide-on-med-and-down">
+                        <li><a href='#' class="waves-effect" id="fullscreenBtn"><i class="material-icons">fullscreen</i></a></li>
+                        <li><a href='#' data-target='createModal' class="waves-effect modal-trigger">Create</a></li>
+                        <li><a href='#' data-target='exportModal' class="waves-effect modal-trigger">Export</a></li>
+                        <li><a href="#" data-target="aboutMeModal" class="waves-effect modal-trigger">About me</a></li>
+                    </ul>
+                </div>
+            </nav>
+        </div>
+        <!--DXF to DSTV modal-->
+        <div id="dxfToNCModal" class="modal">
+            <div class="modal-content">
+                <h4>DXF to DSTV Options</h4>
+                <form id="dxfForm" novalidate>
+                    <div class="input-group">
+                        <span class="helper-text">Order:</span>
+                        <input id="dxfOrderInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Drawing:</span>
+                        <input id="dxfDrawingInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Phase:</span>
+                        <input id="dxfPhaseInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Grade:</span>
+                        <input id="dxfGradeInput" type="text" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Quantity:</span>
+                        <input id="dxfQuantityInput" type="number" min="1" step="1" max="99999" class="compact-input" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="helper-text">Thickness:</span>
+                        <input id="dxfThicknessInput" type="number" min="0.1" step="0.1" max="99999" class="compact-input" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn waves-effect" id="batchDxfToNCButton">Batch Import</button>
+                        <button type="button" class="btn waves-effect" id="dxfToNCButton">Import</button>
+                        <a href="#!" class="waves-effect waves-red btn red" id="dxfToNCCloseButton">Close</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!--DSTV export modal-->
+        <div id="NCModal" class="modal">
+            <div class="modal-content">
+                <h4>Export Options</h4>
+                <div>
+                    <span class="deep-purple-text lighten-3">Remove holes:</span>
+                    <label>
+                        <input type="checkbox" id="removeHoles" checked>
+                        <span for="removeHoles"></span>
+                    </label>
+                </div>
+                <div>
+                    <span class="deep-purple-text lighten-3">Remove cuts:</span>
+                    <label>
+                        <input type="checkbox" id="removeCuts" checked>
+                        <span for="removeCuts"></span>
+                    </label>
+                </div>
+                <div>
+                    <span class="deep-purple-text lighten-3">Remove mitre:</span>
+                    <label>
+                        <input type="checkbox" id="removeMitre" checked>
+                        <span for="removeMitre"></span>
+                    </label>
+                </div>
+                <div>
+                    <span class="deep-purple-text lighten-3">Remove text:</span>
+                    <label>
+                        <input type="checkbox" id="removeText" checked>
+                        <span for="removeText"></span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <a href='#' data-target='' class="btn waves-effect modal-trigger" id="exportNCButton">Export DSTV</a>
+                    <a href='#' data-target='' class="btn waves-effect modal-trigger" id="batchExportNCButton">Batch Export DSTV</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--Export modal-->
+        <div id="exportModal" class="modal">
+            <div class="modal-content">
+                <h4>Export</h4>
+                <a href="#" onclick="downloadActiveViews()" class="btn waves-effect">Download active views</a>
+                <a href='#' data-target='DXFModal' class="modal-close btn waves-effect modal-trigger" onclick="loadDXFSettings()">Export DXF</a>
+                <a href='#' data-target='FNCModal' class="modal-close btn waves-effect modal-trigger" id="exportFNCButton" onclick="loadFNCSettings()">Export FNC</a>
+                <a href='#' data-target='NCModal' class="modal-close btn waves-effect modal-trigger" id="exportNCButton">Export DSTV</a>
+                <div class="modal-footer">
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--FNC export modal-->
+        <div id="FNCModal" class="modal">
+            <div class="modal-content">
+                <h4>Export Options</h4>
+                    <div class="modalMinHeight">
+                        <div class="input-field">
+                            <select id="FNCDrillTypeSelect">
+                            <option value="Punch" selected>Punch</option>
+                            <option value="Drill">Drill</option>
+                            <option value="Tap">Tap</option>
+                            </select>
+                            <label>Drill Type Select</label>
+                        </div>
+                        <div>
+                            <span class="deep-purple-text lighten-3">Remove Mitre:</span>
+                            <label>
+                                <input type="checkbox" id="removeFNCMitre" checked>
+                                <span for="removeFNCMitre"></span>
+                            </label>
+                        </div>
+                        <div>
+                            <span class="deep-purple-text lighten-3">Remove Holes:</span>
+                            <label>
+                                <input type="checkbox" id="removeFNCHoles" checked>
+                                <span for="removeFNCHoles"></span>
+                            </label>
+                        </div>
+                        <div class="input-group">
+                            <span class="helper-text">Constraint Material:</span>
+                            <input id="constraintMaterialInput" type="text" class="compact-input" placeholder="Optional constraint material" title="Optional constraint material, e.g., 'S235', 'S355', etc.">
+                        </div>
+                    </div>
+                <div class="modal-footer">
+                    <a href='#' class="btn waves-effect modal-trigger" onclick="ncToFnc()">Export FNC</a>
+                    <a href='#' class="btn waves-effect modal-trigger" onclick="BatchNcToFnc()">Batch Export FNC</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--DSTV creation modal-->
+        <div id="createModal" class="modal">
+            <div class="modal-content create-modal-content">
+                <h4>Create DSTV file</h4>
+                <div class="modalMinHeight">
+                    <div class="input-field">
+                        <select id="sectionTypeSelect">
+                            <option value="I" selected>I</option>
+                            <option value="U">U</option>
+                            <option value="L">L</option>
+                            <option value="M">M (SHS/RHS)</option>
+                            <option value="RO">RO (Pipe)</option>
+                            <option value="RU">RU (Rod)</option>
+                            <option value="B">B (Plate)</option>
+                            <option value="C">C</option>
+                            <option value="T">T</option>
+                        </select>
+                        <label>Section Type Select</label>
+                    </div>
+                    
+                    <div class="profile-input-container" style="margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                            <div class="input-field" style="flex: 1; margin-bottom: 0;">
+                                <i class="material-icons prefix">search</i>
+                                <input type="text" id="sectionDetailsAutocomplete" class="autocomplete" disabled>
+                                <label for="sectionDetailsAutocomplete">Section Details</label>
+                            </div>
+                            <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" 
+                            id="sectionDetailsDropdownBtn" data-target="sectionDetailsDropdown" 
+                            style="margin-bottom: 0.5rem;">
+                                <i class="material-icons">arrow_drop_down</i>
+                            </a>
+                        </div>
+                        <ul id='sectionDetailsDropdown' class='dropdown-content dropDownLimitHeight'>
+                            <li><a class="deep-purple-text">Please select a section type first!</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="row input-columns">
+                        <div class="col s12 m4 l4">
+                            <div class="input-group">
+                                <span class="helper-text">Order:</span>
+                                <input id="orderInput" type="text" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Drawing:</span>
+                                <input id="drawingInput" type="text" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Phase:</span>
+                                <input id="PhaseInput" type="text" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Position:</span>
+                                <input id="positionInput" type="text" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Grade:</span>
+                                <input id="gradeInput" type="text" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Quantity:</span>
+                                <input id="quantityInput" type="number" min="0" step="1" max="99999" class="compact-input">
+                            </div>
+                        </div>
+                        <div class="col s12 m4 l4">
+                            <div class="input-group">
+                                <span class="helper-text">Length:</span>
+                                <input id="lengthInput" type="number" min="0" step="0.01" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Height:</span>
+                                <input id="heighthInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Flange Width:</span>
+                                <input id="flangeWidthInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Flange Thickness:</span>
+                                <input id="flangeThicknessInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Web Thickness:</span>
+                                <input id="webThicknessInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Radius:</span>
+                                <input id="radiusInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                        </div>
+                        <div class="col s12 m4 l4">
+                            <div class="input-group">
+                                <span class="helper-text">Weight Per Meter:</span>
+                                <input id="weightInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Paint Surface Per Meter:</span>
+                                <input id="paintSurfaceInput" type="number" min="0" step="0.1" max="99999" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Web Start Cut:</span>
+                                <input id="webStartCutInput" type="number" min="-90" step="0.1" max="90" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Web End Cut:</span>
+                                <input id="webEndCutInput" type="number" min="-90" step="0.1" max="90" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Flange Start Cut:</span>
+                                <input id="flangeStartCutInput" type="number" min="-90" step="0.1" max="90" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Flange End Cut:</span>
+                                <input id="flangeEndCutInput" type="number" min="-90" step="0.1" max="90" class="compact-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <input type="file" id="csvUploadInput" accept=".csv" style="display: none;">
+                    <a href="#" class="btn waves-effect modal-trigger">Batch from CSV</a>
+                    <a href="#" class="btn waves-effect"onclick="downloadBatchCsvSample()">Batch from CSV sample</a>
+                    <a href='#' class="btn waves-effect modal-trigger" onclick="createNC()">Create</a>
+                    <a href='#' class="btn waves-effect modal-trigger" onclick="downloadNC()">Download</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--DXF modal-->
+        <div id="DXFModal" class="modal">
+            <div class="modal-content">
+                <h4>Export Options</h4>
+                <div>
+                    <span class="helper-text">Geometry Layer:</span>
+                    <input id="geometryLayer" type="text" value="Geometry" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Geometry:</span>
+                    <label>
+                        <input type="checkbox" id="geometryVisibility">
+                        <span for="geometryVisibility"></span>
+                    </label>
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Holes Layer:</span>
+                    <input id="holesLayer" type="text" value="Holes" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Holes:</span>
+                    <label>
+                        <input type="checkbox" id="holeVisibility">
+                        <span for="holeVisibility"></span>
+                    </label>
+                </div>
+                <div>
+                    <span class="helper-text">Ignore holes with diameter less than:</span>
+                    <input id="minHoleDia" type="number" min="0" max="9999" value="0" style="width: 7rem">
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Text Layer:</span>
+                    <input id="textLayer" type="text" value="Text" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Text:</span>
+                    <label>
+                        <input type="checkbox" id="textVisibility">
+                        <span for="textVisibility"></span>
+                    </label>
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Snap Layer:</span>
+                    <input id="snapLayer" type="text" value="Snap" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Snap Points:</span>
+                    <label>
+                        <input type="checkbox" id="snapVisibility">
+                        <span for="snapVisibility"></span>
+                    </label>
+                </div>
+                <li class="divider" tabindex="-1"></li>
+                <div>
+                    <span class="helper-text">Measurement Layer:</span>
+                    <input id="measurementLayer" type="text" value="Measurement" style="width: 7rem">
+                    <span class="deep-purple-text lighten-3">Show Measurements:</span>
+                    <label>
+                        <input type="checkbox" id="measurementVisibility">
+                        <span for="measurementVisibility"></span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <a href='#' class="modal-close waves-effect waves-red btn green" onclick="batchExportToDXF()">Batch Export DXF</a>
+                    <a href='#' class="modal-close waves-effect waves-red btn green" onclick="exportToDXF()">Export DXF</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn red">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--About me modal-->
+        <div id="aboutMeModal" class="modal">
+            <div class="modal-content">
+                <h4>Welcome to OpenSteel</h4>
+                <p>An open-source project crafted with care by <b>Ahmed Mohamed Ragab</b>.</p>
+                <p>OpenSteel is designed to simplify the workflow of professionals in steel detailing, CNC machining, and structural steel fabrication by providing an intuitive interface to view and explore <b>DSTV (.nc/.nc1)</b> files.</p>
+                <p>In addition to NC file visualization, OpenSteel includes a comprehensive <b>Steel Profile Library</b>, allowing you to browse and reference standard steel sections with ease.</p>
+                <p>OpenSteel also performs <b>linear nesting</b> from user input and/or loaded DSTV files, optimizing material usage for your fabrication projects.</p>
+                <p>Whether you're inspecting part geometry, working with steel profiles, or optimizing material utilization through nesting, OpenSteel brings clarity and convenience to your everyday tasks.</p>
+                <a href="https://www.linkedin.com/in/ahmedmora" class="waves-effect linkedin-link" target="_blank">
+                    <svg class="linkedin" width="2rem" height="2rem" viewBox="0 0 24 24" fill="currentColor"><path fill="#0A66C2" d="M12.225 12.225h-1.778V9.44c0-.664-.012-1.519-.925-1.519-.926 0-1.068.724-1.068 1.47v2.834H6.676V6.498h1.707v.783h.024c.348-.594.996-.95 1.684-.925 1.802 0 2.135 1.185 2.135 2.728l-.001 3.14zM4.67 5.715a1.037 1.037 0 01-1.032-1.031c0-.566.466-1.032 1.032-1.032.566 0 1.031.466 1.032 1.032 0 .566-.466 1.032-1.032 1.032zm.889 6.51h-1.78V6.498h1.78v5.727zM13.11 2H2.885A.88.88 0 002 2.866v10.268a.88.88 0 00.885.866h10.226a.882.882 0 00.889-.866V2.865a.88.88 0 00-.889-.864z"/></svg>
+                    LinkedIn Profile
+                </a>
+                <div class="modal-footer">
+                    <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--Shortcuts  modal-->
+        <div id="shortcutsModal" class="modal">
+            <div class="modal-content">
+                <h4>Shortcuts</h4>
+                <ul id="shortcut-list">
+                    <li><b>P</b>Pan tool</li>
+                    <li><b>M</b>Measure tool</li>
+                    <li><b>T</b>Toggle snap points on/off</li>
+                    <li><b>C</b>Clear all measurements</li>
+                    <li>
+                        <b>
+                        <i class="material-icons tiny">arrow_upward</i>
+                        <i class="material-icons tiny">arrow_downward</i>
+                        </b>
+                        Navigate imported files
+                    </li>
+                    <li>
+                        <b>
+                        <i class="material-icons tiny">arrow_back</i>
+                        <i class="material-icons tiny">arrow_forward</i>
+                        </b>
+                        Navigate hole data
+                    </li>
+                    <li><b>Home/End</b>Increase/Decrease snap point size</li>
+                    <li><b>Page Up/Down</b>Increase/Decrease snap point distance</li>
+                    <li><b>F</b>Toggle resizing and dragging of measurement text</li>
+                    <li><b>E</b>Export options</li>
+                    <li><b>S</b>Save the visible area of the active view</li>
+                    <li><b>Ctrl + S</b>Save all currently visible areas of views</li>
+                    <li><b>O</b>Toggle <span class="view-name">O</span> view on/off</li>
+                    <li><b>V</b>Toggle <span class="view-name">V</span> view on/off</li>
+                    <li><b>U</b>Toggle <span class="view-name">U</span> view on/off</li>
+                    <li><b>H</b>Toggle <span class="view-name">H</span> view on/off</li>
+                </ul>
+                <div class="modal-footer">
+                    <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
+                </div>
+            </div>
+        </div>
+        <!--Clear all modal-->
+        <div id="clearAllModal" class="modal">
+            <div class="modal-content">
+              <h4>CLEAR ALL FILES!</h4>
+              <p><b>Are you sure you want to clear all files?</b></p>
+              <div class="modal-footer">
+                <a href="#!" class="modal-close waves-effect waves-red btn red" onclick="clearAllFiles()">Yes</a>
+                <a href="#!" class="modal-close waves-effect waves-red btn green">No</a>
+              </div>
+            </div>
+        </div>
+        <!--Clear measurements modal-->
+        <div id="clearMeasurementsModal" class="modal">
+            <div class="modal-content">
+              <h4>CLEAR ALL MEASUREMENTS!</h4>
+              <p><b>Are you sure you want to clear all measurements?</b></p>
+              <div class="modal-footer">
+                <a href="#!" class="modal-close waves-effect waves-red btn red" onclick="clearMeasurements()">Yes</a>
+                <a href="#!" class="modal-close waves-effect waves-red btn green">No</a>
+              </div>
+            </div>
+        </div>
+        <!--Add hole modal-->
+        <div id="addHoleModal" class="modal">
+            <div class="modal-content">
+              <h4>Add Hole</h4>
+                    <div class="input-field">
+                        <select id="holeTypeSelect">
+                            <option value="" selected>Complete hole</option>
+                            <option value="g">Threaded hole</option>
+                            <option value="l">Left threaded hole</option>
+                            <option value="m">Mark</option>
+                            <option value="s">Countersunk hole</option>
+                            <option value="sl">Slotted hole</option>
+                        </select>
+                        <label>Hole type Select</label>
+                    </div>
+                    <div class="input-field">
+                        <select id="viewSelect">
+                            <option value="o" selected>O view</option>
+                            <option value="v">V view</option>
+                            <option value="u">U view</option>
+                            <option value="h">H view</option>
+                        </select>
+                        <label>View Select</label>
+                    </div>
+                    <div class="input-field">
+                        <select id="dimRefSelect">
+                            <option value="o" selected>Top edge</option>
+                            <option value="s">Axis</option>
+                            <option value="u">Bottom edge</option>
+                        </select>
+                        <label>Dimension reference Select</label>
+                    </div>
+                    <div class="row input-columns">
+                        <div class="col s12 m6 l6">
+                            <div class="input-group">
+                                <span class="helper-text">X position:</span>
+                                <input id="xPosInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Y position:</span>
+                                <input id="yPosInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Diameter:</span>
+                                <input id="diameterInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">depth:</span>
+                                <input id="depthInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                        </div>
+                        <div class="col s12 m6 l6">
+                            <div class="input-group">
+                                <span class="helper-text">Slot width:</span>
+                                <input id="slotWidthInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Slot height:</span>
+                                <input id="slotHeightInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                            <div class="input-group">
+                                <span class="helper-text">Slot angle:</span>
+                                <input id="slotAngleInput" type="number" min="0" max="99999" step="0.01" class="compact-input">
+                            </div>
+                        </div>
+                    </div> 
+              <div class="modal-footer">
+                <a href='#' class="btn waves-effect modal-trigger" onclick="addHole()">Create</a>
+                <a href="#!" class="modal-close waves-effect waves-red btn-flat">Close</a>
+              </div>
+            </div>
+        </div>
+        <!--Mobile navbar-->
+        <ul class="sidenav" id="mobile">
+            <li><p class="fileTracker">File 0/0</p></li>
+            <div class="file-search-container">
+                <div class="input-field">
+                    <input id="fileSearch" type="text" class="white-text" placeholder="Search files...">
+                    <label for="fileSearch" class="white-text">
+                    </label>
+                </div>
+            </div>
+            <li><p class="filesPlaceHolder">
+                Insert files with 
+                <span class="sidenav-close deep-purple-text lighten-3" 
+                    style="cursor: pointer;"
+                    onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open();">
+                    insert button
+                </span>, or using drag and drop.
+            </p></li>
+            <li id="sideNavClearAll"><a data-target="clearAllModal" class="sidenav-close modal-trigger waves-effect float-bottom">Clear all</a></li>
+            <ul class="sideNavBottom">
+                <li><a href='#' data-target='createModal' class="sidenav-close waves-effect modal-trigger">Create</a></li>
+                <li><a href='#' data-target='exportModal' class="sidenav-close waves-effect modal-trigger">Export</a></li>
+                <li><a href="#" onclick="loadProfilesPage()" class="sidenav-close waves-effect float-left">Profiles library</a></li>
+                <li><a href="#" onclick="loadNestingPage()" class="sidenav-close waves-effect float-left">Linear nesting</a></li>
+                <li><a href="#about-me" data-target="aboutMeModal" class="sidenav-close modal-trigger float-left">About me</a></li>
+            </ul>
+        </ul>
+        
+        <main>
+            <div class="row">
+                <div class="col l2 hide-on-med-and-down deep-purple lighten-2" id="files">
+                    <p class="fileTracker">File 0/0</p>
+                    <div class="file-search-container">
+                        <div class="input-field">
+                            <input id="fileSearch" type="text" class="white-text" placeholder="Search files...">
+                            <label for="fileSearch" class="white-text">
+                            </label>
+                        </div>
+                    </div>
+                    <p class="filesPlaceHolder">
+                        Insert files with 
+                        <span class="white-text lighten-3" 
+                            style="cursor: pointer;"
+                            onclick="M.TapTarget.getInstance(document.getElementById('fileInputTapTarget')).open()">
+                            insert button
+                        </span>, or using drag and drop.
+                    </p>
+                </div>
+                <div class="col l8 m12 s12" id="view">
+                    <!-- Dropdown Structure -->
+                    <ul id="historyDropdown" class="dropdown-content">
+                    </ul>
+                    <ul id="viewsDropdown" class="dropdown-content">
+                        <li><a class="deep-purple-text viewSwitch tooltipped lighten-3" data-position="left" data-tooltip="Turn ON" data-view="o">O</a></li>
+                        <li><a class="deep-purple-text viewSwitch tooltipped lighten-3" data-position="left" data-tooltip="Turn ON" data-view="v">V</a></li>
+                        <li><a class="deep-purple-text viewSwitch tooltipped lighten-3" data-position="left" data-tooltip="Turn ON" data-view="u">U</a></li>
+                        <li><a class="deep-purple-text viewSwitch tooltipped lighten-3" data-position="left" data-tooltip="Turn ON" data-view="h">H</a></li>
+                    </ul>
+                    <ul id="settingsDropdown" class="dropdown-content">
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Snap point size:</span>
+                            <input type="number" class="browser-default" id="snapSize">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Snap point distance:</span>
+                            <input type="number" class="browser-default" id="snapDistance">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Snap point Color:</span>
+                            <input type="color" id="snapPointColor">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Origin point Color:</span>
+                            <input type="color" id="originPointColor">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Measurement line color:</span>
+                            <input type="color" id="measurementColor">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Measurement text color:</span>
+                            <input type="color" id="measurementTextColor">
+                        </li>
+                        <li class="settings-item">
+                            <span class="deep-purple-text lighten-3">Measurement text Transform:</span>
+                            <label>
+                                <input type="checkbox" id="measurementTextTransform">
+                                <span for="measurementTextTransform"></span>
+                            </label>
+                        </li>
+                        <li class="divider"></li>
+                        <li>
+                            <a href="#" class="waves-effect waves-light grey-text text-lighten-5 lighten-1 center-align deep-purple" id="saveSettings">Apply</a>
+                        </li>
+                    </ul>
+                    <!-- Function Buttons -->
+                    <div id="functionButtons">
+                        <a class="waves-effect waves-light btn-small tooltipped deep-purple" data-position="bottom" data-tooltip="Pan" id="panTool" onclick="activatePanTool()">
+                            <i class="material-icons">pan_tool</i>
+                        </a>
+                        <a class="waves-effect waves-light btn-small tooltipped deep-purple lighten-3" data-position="bottom" data-tooltip="Measure" id="measureTool" onclick="activateMeasureTool()">
+                            <i class="material-icons">keyboard_tab</i>
+                        </a>
+                        <a class="waves-effect waves-light btn-small tooltipped deep-purple lighten-3" data-position="bottom" data-tooltip="Toggle snap points" id="toggleSnap" onclick="toggleSnapIndicators()">
+                            <i class="material-icons">remove_red_eye</i>
+                        </a>
+                        <a class="waves-effect waves-light btn-small modal-trigger deep-purple" data-position="bottom" data-tooltip="Clear Measurements" id="clearMeasurements" href="#clearMeasurementsModal" data-target="clearMeasurementsModal">
+                            <i class="material-icons">delete</i>
+                        </a>
+                        <!-- Dropdown Trigger -->
+                        <a class="waves-effect waves-light btn-small tooltipped deep-purple dropdown-trigger lighten-3" data-position="bottom" data-tooltip="Measurement history" id="historyDropdownBtn" data-target="historyDropdown">
+                            <i class="material-icons">history</i>
+                        </a>
+                        <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" id="viewsDropDownBtn" data-target="viewsDropdown">
+                            Views <i class="material-icons right hide-on-small-only">arrow_drop_down</i>
+                        </a>
+                        <a class="waves-effect waves-light btn-small deep-purple dropdown-trigger" id="settingsDropDownBtn" data-target="settingsDropdown">
+                            <i class="material-icons">settings</i>
+                            <i class="material-icons right hide-on-small-only">arrow_drop_down</i>
+                        </a>
+                    </div>
+                    <P id="oViewTitle">Top view (O)</P>
+                    <div id="o-view" class="view z-depth-3"></div>
+                    <P id="vViewTitle">Web/Front view (V)</P>
+                    <div id="v-view" class="view z-depth-3"></div>
+                    <P id="uViewTitle">Bottom view (U)</P>
+                    <div id="u-view" class="view z-depth-3"></div>
+                    <P id="hViewTitle">Behind view (H)</P>
+                    <div id="h-view" class="view z-depth-3"></div>
+                </div>
+                <div class="col l2 m12 s12 deep-purple lighten-2" id="properties">
+                    <ul class="tabs">
+                        <li class="tab col s6"><a href="#tab1" class="active deep-purple lighten-2">Properties</a></li>
+                        <li class="tab col s6"><a href="#tab2" class="deep-purple lighten-2">Hole Info</a></li>
+                    </ul>
+                    <div id="tab1" class="tab-content">
+                        <div id="Project"><h5>Project:</h5><p>N/A</p></div>
+                        <div id="Drawing"><h5>Drawing:</h5><p>N/A</p></div>
+                        <div id="Phase"><h5>Phase:</h5><p>N/A</p></div>
+                        <div id="Piece"><h5>Piece:</h5><p>N/A</p></div>
+                        <div id="Grade"><h5>Grade:</h5><p>N/A</p></div>
+                        <div id="Quantity"><h5>Quantity:</h5><p>N/A</p></div>
+                        <div id="Profile"><h5>Profile:</h5><p>N/A</p></div>
+                        <div id="Code"><h5>Profile code:</h5><p>N/A</p></div>
+                        <div id="Length"><h5>Length:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="Height"><h5>Height:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="flangeWidth"><h5>Flange width:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="flangeThickness"><h5>Flange thickness:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="webThickness"><h5>Web thichness:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="Radius"><h5>Radius:</h5><p>N/A</p><p> mm</p></div>
+                        <div id="weight"><h5>Weight by meter:</h5><p>N/A</p><p> kg/m</p></div>
+                        <div id="Surface"><h5>Painting surface by meter:</h5><p>N/A</p><p> m2/m</p></div>
+                        <div id="webCutStart"><h5>Web start cut:</h5><p>N/A</p><p> degrees</p></div>
+                        <div id="webCutEnd"><h5>Web end cut:</h5><p>N/A</p><p> degrees</p></div>
+                        <div id="flangeCutStart"><h5>Flange start cut:</h5><p>N/A</p><p> degrees</p></div>
+                        <div id="flangeCutEnd"><h5>Flange end cut:</h5><p>N/A</p><p> degrees</p></div>
+                        <div id="textInfo1"><h5>Text info:</h5><p>N/A</p></div>
+                        <div id="textInfo2"><h5>Text info:</h5><p>N/A</p></div>
+                        <div id="textInfo3"><h5>Text info:</h5><p>N/A</p></div>
+                        <div id="textInfo4"><h5>Text info:</h5><p>N/A</p></div>
+                        <div><img class="materialboxed" id="profileViewsImg" src=""></div>
+                    </div>
+                    <div id="tab2" class="tab-content">
+                        <a id="addHoleBtn" class="waves-effect waves-light btn-small deep-purple modal-trigger" data-target="addHoleModal">
+                            <i class="material-icons">add</i>
+                            Add Hole
+                        </a>
+                        <div id="holeInfoContainer" class="holeInfoContainer"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <div class="fixed-action-btn">
+            <a class="btn-floating btn-large deep-purple darken-4" id="fileInputBtn">
+                <i class="large material-icons tooltipped" data-position="left" data-tooltip="Insert" onclick="insert_file(this)"><input type="file" hidden id="fileInput" placeholder="File input" directory multiple>insert_drive_file</i>
+            </a>
+        </div>
+
+        <!-- Tap Target Structure -->
+        <div class="tap-target deep-purple darken-4" data-target="fileInputBtn" id="fileInputTapTarget"></div>
+        
+        <!--Includes js file for materialize-->
+        <script src="Scripts/materialize-main.js"></script>
+        <!--Includes js file for konva-->
+        <script src="Scripts/konva.min.js"></script>
+        <!--Includes js file for jszip-->
+        <script src="Scripts/jszip.min.js"></script>
+        <!--Custom js files-->
+        <script src="Scripts/batch-nc-from-csv.js"></script>
+        <script src="Scripts/dxf-to-nc.js"></script>
+        <script src="Scripts/nc-file-creator.js"></script>
+        <script src="Scripts/nc-to-fnc.js"></script>
+        <script src="Scripts/konva-to-dxf.js"></script>
+        <script src="Scripts/konva-scripts.js"></script>
+        <script src="Scripts/blocDrawer.js"></script>
+        <script src="Scripts/fileHandler.js"></script>
+        <script src="Scripts/materialize-scripts.js"></script>
+        <script src="Scripts/ncFileParser.js"></script>
+        <script src="Scripts/main.js"></script>
+        <script src="Scripts/full-screen.js"></script>
+        <script src="Scripts/search-files.js"></script>
+    </body>
+</html>
