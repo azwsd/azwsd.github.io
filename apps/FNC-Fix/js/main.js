@@ -945,7 +945,7 @@ function createGroupedBarSection(groupedBars) {
 
     groupedBars.forEach(group => {
         barSection += '[[BAR]]\n[HEAD]\n';
-        barSection += `N:${group.bar.name} M:${group.bar.material} CP:${group.bar.profileType} P:${group.bar.profile}\nLB${group.bar.length} BI${group.totalQuantity} ${group.bar.data}\n`;
+        barSection += `N:${group.bar.name} M:${group.bar.material} CP:${group.bar.profileType} P:${group.bar.profile}\nLB${group.bar.length} BI${group.totalQuantity} ${group.bar.data ? `${group.bar.data}` : ''}\n`;
         group.bar.pieces.forEach(piece => {
             barSection += `[PCS] C:${piece.project} D:${piece.drawing} N:${piece.mark} ${piece.position ? `POS:${piece.position}` : ''} QT${piece.quantity}\n`;
         });
