@@ -523,18 +523,6 @@ table thead th {
     transform: scale(1.1);
 }
 
-#add-replacement {
-    background: linear-gradient(135deg, #42a5f5 0%, #5c6bc0 100%);
-    border-radius: 10px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-#add-replacement:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(66, 165, 245, 0.5);
-}
-
 #execute-replacements #download-fnc-btn {
     background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%) !important;
     border-radius: 12px;

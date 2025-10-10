@@ -691,7 +691,7 @@ function updateOptionsPanel() {
                         </div>
                     </div>
                 </div>
-                <button class="btn-small waves-effect" id="add-replacement">
+                <button class="btn-small blue lighten-1 waves-effect" id="add-replacement">
                     Add More
                 </button>
                 <button class="btn-small purple lighten-1 waves-effect" id="execute-replacements">
@@ -699,6 +699,9 @@ function updateOptionsPanel() {
                 </button>
             </div>
             <div class="option-section">
+                <button class="btn-small purple lighten-1 waves-effect" id="reset-btn" onclick="location.reload()">
+                    Reset
+                </button>
                 <button class="btn waves-effect waves-light" id="download-fnc-btn">
                     Download Modified FNC
                 </button>
