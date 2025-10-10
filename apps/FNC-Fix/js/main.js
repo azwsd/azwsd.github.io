@@ -6,6 +6,7 @@ let maxPositionLength = 12;
 let referenceProfile = null;
 let referenceMaterial = null;
 let originalFileContent = '';
+let duplicateBars = false;
 
 // Parse FNC file content
 function parseFNC(content) {
@@ -65,6 +66,7 @@ function parseFNC(content) {
                 j++;
             }
             currentBar.pieces = parseBarPieces(pieceLines.join(' '));
+            currentBar.hash = hashBar(currentBar);
             data.bars.push(currentBar);
             currentBar = null;
         } else if (currentPiece && line === '' && currentBlock === 'PCS') {
@@ -80,6 +82,57 @@ function parseFNC(content) {
     }
 
     return data;
+}
+
+// Hash function for bars
+function hashBar(bar) {
+  // Sort and hash the pieces array
+  const piecesHash = bar.pieces
+    ? bar.pieces
+        .map(piece => [
+          piece.project || '',
+          piece.drawing || '',
+          piece.mark || '',
+          piece.position || '',
+          piece.quantity || ''
+        ].join('|'))
+        .sort()
+        .join('||')
+    : '';
+  
+  // Create a string from all properties
+  const hashString = [
+    bar.material || '',
+    bar.profileType || '',
+    bar.profile || '',
+    bar.length || '',
+    bar.quantity || '',
+    bar.data || '',
+    piecesHash
+  ].join('###');
+  
+  // djb2 algorithm
+  let hash = 5381;
+  for (let i = 0; i < hashString.length; i++) {
+    hash = ((hash << 5) + hash) + hashString.charCodeAt(i); // hash * 33 + c
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return hash.toString(36); // Convert to base-36 for shorter string
+}
+
+function groupSimilarBars() {
+    const barGroups = new Map();
+    currentData.bars.forEach(bar => {
+        const hash = bar.hash;
+        if (!barGroups.has(hash)) {
+            barGroups.set(hash, {bar : bar, totalQuantity: 0 });
+        }
+        const group = barGroups.get(hash);
+        group.totalQuantity += (bar.quantity || 0);
+    });
+    
+    return barGroups;
 }
 
 function parseProfile(line) {
@@ -153,7 +206,8 @@ function parseBarHeader(headerText) {
         cp: headerText.match(/CP:(\S+)/),
         p: headerText.match(/(?<!C)P:([^\s]+)/),
         lb: headerText.match(/LB([\d.]+)/),
-        bi: headerText.match(/BI(\d+)/)
+        bi: headerText.match(/BI(\d+)/),
+        data: headerText.match(/BI\d+\s+(.*?)$/m)
     };
 
     if (matches.n) bar.name = matches.n[1];
@@ -162,13 +216,15 @@ function parseBarHeader(headerText) {
     if (matches.p) bar.profile = matches.p[1];
     if (matches.lb) bar.length = parseFloat(matches.lb[1]);
     if (matches.bi) bar.quantity = parseInt(matches.bi[1]);
+    if (matches.data) bar.data = matches.data[1];
 
     return bar;
 }
 
 function parseBarPieces(piecesText) {
     const pieces = [];
-    const regex = /C:(\S+)\s+D:(\S+)\s+N:(\d+)\s+QT(\d+)/g;
+    // Regex to match pieces in bar section with optional POS
+    const regex = /C:(\S+)\s+D:(\S+)\s+N:(\S+)\s+(?:POS:(\S+)\s+)?QT(\d+)/g;
     let match;
 
     while ((match = regex.exec(piecesText)) !== null) {
@@ -176,7 +232,8 @@ function parseBarPieces(piecesText) {
             project: match[1],
             drawing: match[2],
             mark: match[3],
-            quantity: parseInt(match[4])
+            position: match[4] || null, // Handle optional POS
+            quantity: parseInt(match[5])
         });
     }
 
@@ -374,36 +431,36 @@ function renderBars(bars) {
             <div class="card-content">
                 <span class="card-title">Bars/Nests (${bars.length})</span>
                 ${bars.map((b, i) => `
-                    <div class="section">
-                        <h6>Bar ${i + 1}</h6>
+                    <div class="section ${b.unique ? '' : 'warning'}">
+                        <h6>Bar ${i + 1} ${b.unique ? '' : 'Duplicate'}</h6>
                         <div class="data-grid">
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Name (N):</span>
                                 <span class="data-value">${b.name || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile Type (CP):${isProfileMismatch(b, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.profileType || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile (P):${isProfileMismatch(b, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.profile || '-'}</span>
                             </div>
-                            <div class="data-item ${isMaterialMismatch(b, referenceMaterial) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isMaterialMismatch(b, referenceMaterial) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Material (M):${isMaterialMismatch(b, referenceMaterial) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.material || '-'}</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Length (LB):</span>
                                 <span class="data-value">${b.length || '-'} mm</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Quantity (BI):</span>
                                 <span class="data-value">${b.quantity || '-'}</span>
                             </div>
@@ -416,6 +473,7 @@ function renderBars(bars) {
                                         <th>Project</th>
                                         <th>Drawing</th>
                                         <th>Mark</th>
+                                        <th>Position</th>
                                         <th>Quantity</th>
                                     </tr>
                                 </thead>
@@ -425,6 +483,7 @@ function renderBars(bars) {
                                             <td>${p.project}</td>
                                             <td>${p.drawing}</td>
                                             <td>${p.mark}</td>
+                                            <td>${p.position ? p.position : '-'}</td>
                                             <td>${p.quantity}</td>
                                         </tr>
                                     `).join('')}
@@ -443,7 +502,8 @@ function displayData(data, filename) {
     currentFilename = filename;
     referenceProfile = data.profiles.length > 0 ? data.profiles[0] : null;
     referenceMaterial = data.materials.length > 0 ? data.materials[0] : null;
-    
+    setBarsUniqueFlag();
+
     const filesCol = document.getElementById('files-col');
     filesCol.innerHTML = `
         <div style="padding: 20px;">
@@ -458,10 +518,6 @@ function displayData(data, filename) {
     `;
 
     updateOptionsPanel();
-
-    // Hook download button
-    const dlBtn = document.getElementById('download-fnc-btn');
-    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 function downloadModifiedFNC() {
@@ -564,7 +620,7 @@ function updateOptionsPanel() {
         if (checkLength(p.position, maxPositionLength)) positionWarnings++;
     });
     
-    const warningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
+    const lengthWarningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
         <div class="warning-summary">
             ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
             ${positionWarnings > 0 ? `<p>${positionWarnings} position(s) exceed max length</p>` : ''}
@@ -574,18 +630,33 @@ function updateOptionsPanel() {
     const profileCheck = checkProfileConsistency(currentData);
     const materialCheck = checkMaterialConsistency(currentData);
 
+    const profileMismatchWarningHTML = `
+        ${profileCheck.mismatched
+            ? `<p class="warning-summary">${profileCheck.count} profile inconsistency(s) found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="fix-profiles">Fix All Profiles</button>`
+            : '<p class="success-summary">All profiles consistent</p>'}
+    `
+
+    const materialMismatchWarningHTML = `
+        ${materialCheck.mismatched
+            ? `<p class="warning-summary">${materialCheck.count} material inconsistency(s) found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="fix-materials">Fix All Materials</button>`
+            : '<p class="success-summary">All materials consistent</p>'}
+    `
+    
+    const duplicateBarsWarningHTML = `
+        ${duplicateBars
+            ? `<p class="warning-summary">Duplicate bars/Nests found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="group-bars-btn">Group Duplicate Bars/Nests</button>`
+            : '<p class="success-summary">No duplicate bars/Nests found</p>'}
+    `;
+
     const consistencyHTML = `
         <div class="option-section consistency-section">
             <h6>Consistency Checks</h6>
-            ${warningHTML}
-            ${profileCheck.mismatched
-                ? `<p class="warning-summary">${profileCheck.count} profile inconsistency(s) found</p>
-                <button class="btn-small purple lighten-1 waves-effect" id="fix-profiles">Fix All Profiles</button>`
-                : '<p class="success-summary">All profiles consistent</p>'}
-            ${materialCheck.mismatched
-                ? `<p class="warning-summary">${materialCheck.count} material inconsistency(s) found</p>
-                <button class="btn-small purple lighten-1 waves-effect" id="fix-materials">Fix All Materials</button>`
-                : '<p class="success-summary">All materials consistent</p>'}
+            ${profileMismatchWarningHTML}
+            ${materialMismatchWarningHTML}
+            ${duplicateBarsWarningHTML}
         </div>
     `;
 
@@ -596,6 +667,7 @@ function updateOptionsPanel() {
             ${consistencyHTML}
 
             <div class="option-section">
+                ${lengthWarningHTML}
                 <h6>Max Length Settings</h6>
                 <div class="input-field">
                     <label for="max-drawing-length" class="active">Max Drawing Length</label>
@@ -605,9 +677,7 @@ function updateOptionsPanel() {
                     <label for="max-position-length" class="active">Max Position Length</label>
                     <input type="number" id="max-position-length" value="${maxPositionLength}" min="1">
                 </div>
-            </div>
-            
-            <div class="option-section">
+
                 <h6>Text Replacements</h6>
                 <div id="replacements-container">
                     <div class="replacement-item">
@@ -624,11 +694,10 @@ function updateOptionsPanel() {
                 <button class="btn-small waves-effect" id="add-replacement">
                     Add More
                 </button>
-                <button class="btn waves-effect waves-light" id="execute-replacements">
+                <button class="btn-small purple lighten-1 waves-effect" id="execute-replacements">
                     Execute Replacements
                 </button>
             </div>
-            
             <div class="option-section">
                 <button class="btn waves-effect waves-light" id="download-fnc-btn">
                     Download Modified FNC
@@ -638,9 +707,6 @@ function updateOptionsPanel() {
     `;
     
     setupOptionsListeners();
-    // Re-attach download button listener
-    const dlBtn = document.getElementById('download-fnc-btn');
-    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 // Initialize empty options panel
@@ -717,6 +783,13 @@ function setupOptionsListeners() {
     const fixMaterialsBtn = document.getElementById('fix-materials');
     if (fixMaterialsBtn) fixMaterialsBtn.addEventListener('click', fixAllMaterials);
 
+    // Attach group similar bras/nests button event listener
+    const grBtn = document.getElementById('group-bars-btn');
+    if (grBtn) grBtn.addEventListener('click', fixSimilarBars);
+
+    // Attach download fnc button event listener
+    const dlBtn = document.getElementById('download-fnc-btn');
+    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 // Execute text replacements
@@ -856,6 +929,61 @@ function fixAllMaterials() {
     currentData = parseFNC(originalFileContent);
 
     M.toast({ html: 'All materials fixed' });
+    displayData(currentData, currentFilename);
+    updateOptionsPanel();
+}
+
+// Remove all [[BAR]] sections (from [[BAR]] to the next [[ or end of string)
+function removeBarSections(text) {
+  return text.replace(/\[\[BAR\]\][\s\S]*?(?=\[\[|$)/g, '');
+}
+
+function createGroupedBarSection(groupedBars) {
+    if (!currentData || currentData.bars.length === 0) return '';
+
+    let barSection = '';
+
+    groupedBars.forEach(group => {
+        barSection += '[[BAR]]\n[HEAD]\n';
+        barSection += `N:${group.bar.name} M:${group.bar.material} CP:${group.bar.profileType} P:${group.bar.profile}\nLB${group.bar.length} BI${group.totalQuantity} ${group.bar.data}\n`;
+        group.bar.pieces.forEach(piece => {
+            barSection += `[PCS] C:${piece.project} D:${piece.drawing} N:${piece.mark} ${piece.position ? `POS:${piece.position}` : ''} QT${piece.quantity}\n`;
+        });
+        barSection += '\n'
+    });
+
+    return barSection;
+}
+
+function setBarsUniqueFlag() {
+    const seenHashes = new Set();
+    currentData.bars.forEach(bar => {
+        if (seenHashes.has(bar.hash)) {
+            bar.unique = false;
+            duplicateBars = true;
+        }
+        else {
+            bar.unique = true;
+            seenHashes.add(bar.hash);
+        }
+    });
+}
+
+function fixSimilarBars() {
+    const groupedBars = groupSimilarBars();
+    if (groupedBars.length === 0) return;
+
+    // Remove all existing [[BAR]] sections
+    let modifiedContent = removeBarSections(originalFileContent);
+    modifiedContent += '\n' + createGroupedBarSection(groupedBars);
+
+    originalFileContent = modifiedContent;
+
+    // Re-parse updated file
+    currentData = parseFNC(originalFileContent);
+
+    duplicateBars = false; // Reset global variable
+    M.toast({ html: 'All bars grouped' });
     displayData(currentData, currentFilename);
     updateOptionsPanel();
 }
