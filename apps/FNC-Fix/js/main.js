@@ -1,12 +1,15 @@
 // Global state
 let currentData = null;
 let currentFilename = '';
+let maxProjectLength = 12;
 let maxDrawingLength = 12;
+let maxMarkLength = 12;
 let maxPositionLength = 12;
 let referenceProfile = null;
 let referenceMaterial = null;
 let originalFileContent = '';
 let duplicateBars = false;
+let duplicatePieces = false;
 
 // Parse FNC file content
 function parseFNC(content) {
@@ -71,6 +74,7 @@ function parseFNC(content) {
             currentBar = null;
         } else if (currentPiece && line === '' && currentBlock === 'PCS') {
             if (Object.keys(currentPiece).length > 0) {
+                currentPiece.hash = hashPiece(currentPiece);
                 data.pieces.push(currentPiece);
                 currentPiece = {};
             }
@@ -121,6 +125,41 @@ function hashBar(bar) {
   return hash.toString(36); // Convert to base-36 for shorter string
 }
 
+function hashPiece(piece) {
+    const hashString = [
+        piece.project || '',
+        piece.drawing || '',
+        piece.mark || '',
+        piece.position || '',
+        piece.quantity || ''
+    ].join('###');
+
+    // djb2 algorithm
+    let hash = 5381;
+    for (let i = 0; i < hashString.length; i++) {
+        hash = ((hash << 5) + hash) + hashString.charCodeAt(i); // hash * 33 + c
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return hash.toString(36); // Convert to base-36 for shorter string
+}
+
+function checkDuplicatePieces() {
+    const seenHashes = new Set();
+    duplicatePieces = false;
+    currentData.pieces.forEach(piece => {
+        if (seenHashes.has(piece.hash)) {
+            piece.unique = false;
+            duplicatePieces = true;
+        } else {
+            piece.unique = true;
+            seenHashes.add(piece.hash);
+        }
+    });
+    
+    return duplicatePieces;
+}
+
 function groupSimilarBars() {
     const barGroups = new Map();
     currentData.bars.forEach(bar => {
@@ -168,7 +207,7 @@ function parsePieceHeader(headerText) {
     const matches = {
         c: headerText.match(/C:(\S+)/),
         d: headerText.match(/D:(\S+)/),
-        n: headerText.match(/N:(\d+)/),
+        n: headerText.match(/N:(\S+)/),
         pos: headerText.match(/POS:(\S+)/),
         m: headerText.match(/M:(\S+)/),
         cp: headerText.match(/CP:(\S+)/),
@@ -346,72 +385,74 @@ function isMaterialMismatch(item, refMat) {
 
 function renderPieces(pieces) {
     if (pieces.length === 0) return '';
+
+    checkDuplicatePieces();
     
     return `
         <div class="card">
             <div class="card-content">
                 <span class="card-title">Pieces (${pieces.length})</span>
                 ${pieces.map((p, i) => `
-                    <div class="section">
-                        <h6>Piece ${i + 1}</h6>
+                    <div class="section ${p.unique ? '' : 'warning'}">
+                        <h6>Piece ${i + 1} ${p.unique ? '' : 'Duplicate'}</h6>
                         <div class="data-grid">
-                            <div class="data-item">
-                                <span class="data-label">Project (C):</span>
+                            <div class="data-item ${checkLength(p.project, maxProjectLength) || !p.unique ? 'warning' : ''}">
+                                <span class="data-label">Project (C):${checkLength(p.project, maxProjectLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.project || '-'}</span>
                             </div>
-                            <div class="data-item ${checkLength(p.drawing, maxDrawingLength) ? 'warning' : ''}">
+                            <div class="data-item ${checkLength(p.drawing, maxDrawingLength) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">Drawing (D):${checkLength(p.drawing, maxDrawingLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.drawing || '-'}</span>
                             </div>
-                            <div class="data-item">
-                                <span class="data-label">Mark (N):</span>
+                            <div class="data-item ${checkLength(p.mark, maxMarkLength) || !p.unique ? 'warning' : ''}">
+                                <span class="data-label">Mark (M):${checkLength(p.mark, maxMarkLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.mark || '-'}</span>
                             </div>
                             ${p.position ? `
-                            <div class="data-item ${checkLength(p.position, maxPositionLength) ? 'warning' : ''}">
-                                <span class="data-label">Position:${checkLength(p.position, maxPositionLength) ? 'Exceeds max length!' : ''}</span>
+                            <div class="data-item ${checkLength(p.position, maxPositionLength) || !p.unique ? 'warning' : ''}">
+                                <span class="data-label">Position (POS):${checkLength(p.position, maxPositionLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.position}</span>
                             </div>
                             ` : ''}
-                            <div class="data-item ${isProfileMismatch(p, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${isProfileMismatch(p, referenceProfile) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile Type (CP):${isProfileMismatch(p, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.profileType || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(p, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${isProfileMismatch(p, referenceProfile) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile (P):${isProfileMismatch(p, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.profile || '-'}</span>
                             </div>
-                            <div class="data-item ${isMaterialMismatch(p, referenceMaterial) ? 'warning' : ''}">
+                            <div class="data-item ${isMaterialMismatch(p, referenceMaterial) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Material (M):${isMaterialMismatch(p, referenceMaterial) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.material || '-'}</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Length (LP):</span>
                                 <span class="data-value">${p.length || '-'} mm</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Web Start Cut (RAI):</span>
                                 <span class="data-value">${p.webStartCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Web End Cut (RAF):</span>
                                 <span class="data-value">${p.webEndCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Flange Start Cut (RBI):</span>
                                 <span class="data-value">${p.flangeStartCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Flange End Cut (RBF):</span>
                                 <span class="data-value">${p.flangeEndCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Quantity (QI):</span>
                                 <span class="data-value">${p.quantity || '-'}</span>
                             </div>
@@ -612,17 +653,23 @@ function updateOptionsPanel() {
     const optionsCol = document.getElementById('options-col');
     
     // Count warnings
+    let projectWarnings = 0;
     let drawingWarnings = 0;
+    let markWarnings = 0;
     let positionWarnings = 0;
     
     currentData.pieces.forEach(p => {
+        if (checkLength(p.project, maxProjectLength)) projectWarnings++;
         if (checkLength(p.drawing, maxDrawingLength)) drawingWarnings++;
+        if (checkLength(p.mark, maxMarkLength)) markWarnings++;
         if (checkLength(p.position, maxPositionLength)) positionWarnings++;
     });
     
     const lengthWarningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
         <div class="warning-summary">
-            ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
+        ${projectWarnings > 0 ? `<p>${projectWarnings} project(s) exceed max length</p>` : ''}
+        ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
+            ${markWarnings > 0 ? `<p>${markWarnings} mark(s) exceed max length</p>` : ''}
             ${positionWarnings > 0 ? `<p>${positionWarnings} position(s) exceed max length</p>` : ''}
         </div>
     ` : '<div class="success-summary"><p>All fields within length limits</p></div>';
@@ -651,12 +698,19 @@ function updateOptionsPanel() {
             : '<p class="success-summary">No duplicate bars/Nests found</p>'}
     `;
 
+    const duplicatePiecesWarningHTML = `
+        ${duplicatePieces
+            ? `<p class="warning-summary">Duplicate pieces found</p>`
+            : '<p class="success-summary">No duplicate pieces found</p>'}
+    `;
+
     const consistencyHTML = `
         <div class="option-section consistency-section">
             <h6>Consistency Checks</h6>
             ${profileMismatchWarningHTML}
             ${materialMismatchWarningHTML}
             ${duplicateBarsWarningHTML}
+            ${duplicatePiecesWarningHTML}
         </div>
     `;
 
@@ -670,8 +724,16 @@ function updateOptionsPanel() {
                 ${lengthWarningHTML}
                 <h6>Max Length Settings</h6>
                 <div class="input-field">
+                    <label for="max-project-length" class="active">Max Project Length</label>
+                    <input type="number" id="max-project-length" value="${maxProjectLength}" min="1">
+                </div>
+                <div class="input-field">
                     <label for="max-drawing-length" class="active">Max Drawing Length</label>
                     <input type="number" id="max-drawing-length" value="${maxDrawingLength}" min="1">
+                </div>
+                <div class="input-field">
+                    <label for="max-mark-length" class="active">Max Mark Length</label>
+                    <input type="number" id="max-mark-length" value="${maxMarkLength}" min="1">
                 </div>
                 <div class="input-field">
                     <label for="max-position-length" class="active">Max Position Length</label>
@@ -726,19 +788,35 @@ function initializeOptionsPanel() {
 // Setup options listeners
 function setupOptionsListeners() {
     // Max length inputs
+    const maxProjectInput = document.getElementById('max-project-length');
     const maxDrawingInput = document.getElementById('max-drawing-length');
+    const maxMarkInput = document.getElementById('max-mark-length');
     const maxPositionInput = document.getElementById('max-position-length');
-    
+
+    if (maxProjectInput) {
+        maxProjectInput.addEventListener('input', (e) => {
+            maxProjectLength = parseInt(e.target.value) || 12;
+            displayData(currentData, currentFilename);
+        });
+    }
+
     if (maxDrawingInput) {
         maxDrawingInput.addEventListener('input', (e) => {
-            maxDrawingLength = parseInt(e.target.value) || 50;
+            maxDrawingInput = parseInt(e.target.value) || 12;
+            displayData(currentData, currentFilename);
+        });
+    }
+
+    if (maxMarkInput) {
+        maxMarkInput.addEventListener('input', (e) => {
+            maxMarkInput = parseInt(e.target.value) || 12;
             displayData(currentData, currentFilename);
         });
     }
     
     if (maxPositionInput) {
         maxPositionInput.addEventListener('input', (e) => {
-            maxPositionLength = parseInt(e.target.value) || 50;
+            maxPositionLength = parseInt(e.target.value) || 12;
             displayData(currentData, currentFilename);
         });
     }
@@ -960,6 +1038,7 @@ function createGroupedBarSection(groupedBars) {
 
 function setBarsUniqueFlag() {
     const seenHashes = new Set();
+    duplicateBars = false;
     currentData.bars.forEach(bar => {
         if (seenHashes.has(bar.hash)) {
             bar.unique = false;
