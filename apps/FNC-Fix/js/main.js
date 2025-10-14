@@ -665,7 +665,7 @@ function updateOptionsPanel() {
         if (checkLength(p.position, maxPositionLength)) positionWarnings++;
     });
     
-    const lengthWarningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
+    const lengthWarningHTML = (projectWarnings > 0 || drawingWarnings > 0 || markWarnings > 0 || positionWarnings > 0) ? `
         <div class="warning-summary">
         ${projectWarnings > 0 ? `<p>${projectWarnings} project(s) exceed max length</p>` : ''}
         ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
@@ -1068,4 +1068,5 @@ function fixSimilarBars() {
     M.toast({ html: 'All bars grouped' });
     displayData(currentData, currentFilename);
     updateOptionsPanel();
+
 }
