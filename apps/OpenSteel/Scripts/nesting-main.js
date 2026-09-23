@@ -80,7 +80,7 @@ function selectFile(file){
 }
 
 //adds file to the html page
-function addFile(fileName, fileData, fileCount, isReload = false){
+function addFile(fileName, fileData, fileCount, isReload = false, isBatch = false){
     //handles if the file already exists
     if (filePairs.has(fileName) && !isReload)
     {
@@ -134,7 +134,7 @@ function addFile(fileName, fileData, fileCount, isReload = false){
     if (fileCounter == 1) filesPlaceHolder();
     //selects imported file in view
     if (fileCounter == fileCount && !isReload) selectFile(fileName);
-    updateSessionData();
+    if (!isBatch) updateSessionData();
 }
 
 //deletes file of pressed button
@@ -246,13 +246,18 @@ async function handleFiles(files) {
     // Convert file list into a file array
     let filesArray = [...files];
     if (!filesArray.length) return;
-    for (const file of filesArray) {
-        const fileName = file.name;
-        if (!verifyFile(fileName)) continue;
-        const fileData = await file.text();
+
+    const fileContents = await Promise.all(filesArray.map(async file => {
+        if (!verifyFile(file.name)) return null;
+        return { name: file.name, text: await file.text() };
+    }));
+
+    for (const fileObj of fileContents) {
+        if (!fileObj) continue;
         // Add the file to the view
-        addFile(fileName, fileData, fileCount);
+        addFile(fileObj.name, fileObj.text, fileCount, false, true);
     }
+    updateSessionData();
 }
 
 // Counter to track drag enter/leave events
@@ -334,7 +339,7 @@ function ncParseHeaderData(fileData){
         //Removes \r from the end of string, replaces spaces with dashes, and removes leading and trailing spaces
         line = line.trim().replace(/\s+/g, '-').replace(/\r$/, '');
         //removes ST line
-        if (line.slice(0, 2).toUpperCase() == 'ST') continue;
+        if (line.toUpperCase() === 'ST') continue;
         //reads only the first 24 lines
         if (lineCounter == 24) break;
         //removes comment lines
@@ -408,21 +413,36 @@ function loadProfilesPage(){
 
 document.addEventListener('DOMContentLoaded', function(){
     if (filePairs != {}) {
-        for (let [fileName, fileData] of filePairs) addFile(fileName, fileData, filePairs.size, true); //Load saved files in session
-    }
-    if (selectedFile != '') {
-        selectedFile = sessionStorage.getItem('selectedFile');
-        selectFile(selectedFile); //Select saved selectedFile in session
+        for (let [fileName, fileData] of filePairs) addFile(fileName, fileData, filePairs.size, true, true); //Load saved files in session
     }
     // Load saved stock
     stockItems = JSON.parse(localStorage.getItem('stockItems')) || [];
     renderStockTable();
+    
     // Add pieces from loaded files to nesting
-    const addPieceBtn = document.getElementById('add-piece');
+    let piecesAdded = false;
     for (const [fileName, fileData] of filePairs) {
-        selectFile(fileName);
+        ncParseHeaderData(fileData);
         if(profileCode.replace(/\s+/g, '').toUpperCase() == 'B') continue; // Skip if profile is plate
-        addPieceBtn.click(); // Simulate click to add piece
+        
+        const pieceLabel = label || length.toString();
+        const color = stringToColor(pieceLabel);
+        
+        pieceItems.push({ 
+            profile: profile.trim().replace(/(\d)\*(\d)/g, '$1X$2').replace(/\s+/g, '-'), 
+            length: parseFloat(length), 
+            amount: parseInt(quantity), 
+            label: pieceLabel, 
+            color: color, 
+            id: Date.now() + Math.random() 
+        });
+        piecesAdded = true;
+    }
+    if (piecesAdded) renderPieceTable();
+
+    if (selectedFile != '') {
+        selectedFile = sessionStorage.getItem('selectedFile');
+        selectFile(selectedFile); //Select saved selectedFile in session
     }
 });
 
@@ -1147,39 +1167,67 @@ function optimizeCuttingNests() {
         });
     }
 
-    // Run in background blob worker — UI never blocks
+    // Run in background blob workers â€” UI never blocks (Parallel execution per profile)
     cuttingNests = [];
     _setNestingUI(true);
-    const worker = _getNestingWorker();
-    worker.onmessage = function(e) {
+    
+    const profiles = Object.keys(profileGroups);
+    if (profiles.length === 0) {
         _setNestingUI(false);
-        const { cuttingNests: result, warnings } = e.data;
-        cuttingNests = result;
-        warnings.forEach(w => M.toast({ html: w, classes: 'rounded toast-warning', displayLength: 2000 }));
         renderCuttingNests(cuttingNests);
-        cuttingNestsDiv.classList.remove('hide');
-        downloadOffcutsBtn.classList.remove('hide');
-        acceptNestBtn.classList.remove('hide');
-        manualEditBtn.classList.remove('hide');
-        M.Tabs.init(document.querySelectorAll('#nesting-tabs'));
-    };
-    worker.onerror = function(err) {
-        _setNestingUI(false);
-        M.toast({ html: 'Nesting error: ' + err.message, classes: 'rounded toast-error', displayLength: 4000 });
-    };
-    worker.postMessage({ profileGroups, stockGroups, params: {
-        gripStart, gripEnd, sawWidth, maxUniqueLabels, minOffcut,
-        preferShorterStocks, useUnlimitedStock, unlimitedStockLength
-    }});
-}
+        return;
+    }
 
-let _nestingWorker = null;
+    let completedWorkers = 0;
+    let allWarnings = [];
+
+    profiles.forEach(profile => {
+        const worker = _createNewWorker();
+        worker.onmessage = function(e) {
+            const { cuttingNests: result, warnings } = e.data;
+            cuttingNests = cuttingNests.concat(result);
+            allWarnings = allWarnings.concat(warnings);
+            completedWorkers++;
+            worker.terminate();
+            
+            if (completedWorkers === profiles.length) {
+                _setNestingUI(false);
+                allWarnings.forEach(w => M.toast({ html: w, classes: 'rounded toast-warning', displayLength: 2000 }));
+                renderCuttingNests(cuttingNests);
+                cuttingNestsDiv.classList.remove('hide');
+                downloadOffcutsBtn.classList.remove('hide');
+                acceptNestBtn.classList.remove('hide');
+                manualEditBtn.classList.remove('hide');
+                M.Tabs.init(document.querySelectorAll('#nesting-tabs'));
+            }
+        };
+        worker.onerror = function(err) {
+            completedWorkers++;
+            worker.terminate();
+            M.toast({ html: 'Nesting error in profile ' + profile + ': ' + err.message, classes: 'rounded toast-error', displayLength: 4000 });
+            if (completedWorkers === profiles.length) {
+                _setNestingUI(false);
+                renderCuttingNests(cuttingNests);
+            }
+        };
+        worker.postMessage({ 
+            profile: profile,
+            pieces: profileGroups[profile], 
+            stocks: stockGroups[profile] || [], 
+            params: {
+                gripStart, gripEnd, sawWidth, maxUniqueLabels, minOffcut,
+                preferShorterStocks, useUnlimitedStock, unlimitedStockLength
+            }
+        });
+    });
+}
 
 const _WORKER_CODE = `
 self.onmessage = function(e) {
-    var pg  = e.data.profileGroups,
-        sg  = e.data.stockGroups,
-        par = e.data.params;
+    var profile = e.data.profile,
+        pieces  = e.data.pieces,
+        stocks  = e.data.stocks,
+        par     = e.data.params;
     var gripStart=par.gripStart, gripEnd=par.gripEnd, sawWidth=par.sawWidth,
         maxUniqueLabels=par.maxUniqueLabels, minOffcut=par.minOffcut,
         preferShorterStocks=par.preferShorterStocks,
@@ -1187,50 +1235,52 @@ self.onmessage = function(e) {
         unlimitedStockLength=par.unlimitedStockLength;
     var cuttingNests=[], warnings=[];
 
-    for (var profile in pg) {
-        if (!sg[profile]) { warnings.push('No available stock for profile: '+profile+'!'); continue; }
-        var pieces=pg[profile], stocks=sg[profile];
-        for (var pi=0;pi<pieces.length;pi++) pieces[pi].assigned=false;
-        for (var si=0;si<stocks.length;si++) {
-            stocks[si].used=false; stocks[si].pieceAssignments=[];
-            stocks[si].remainingLength=stocks[si].usableLength;
-            stocks[si].hasLastPieceWithoutSaw=false;
-        }
-        if (preferShorterStocks) stocks.sort(function(a,b){return a.length-b.length;});
-        if (useUnlimitedStock) {
-            ffdUnlimited(pieces,stocks,gripStart,gripEnd,sawWidth,maxUniqueLabels,profile,sg,unlimitedStockLength);
-        } else {
-            optimize(pieces,stocks,gripStart,sawWidth,maxUniqueLabels);
-        }
-        collectResults(stocks,cuttingNests,gripStart,gripEnd,sawWidth,minOffcut);
+    if (!stocks || stocks.length === 0) {
+        warnings.push('No available stock for profile: '+profile+'!');
+        self.postMessage({cuttingNests:[], warnings:warnings});
+        return;
     }
+
+    for (var pi=0;pi<pieces.length;pi++) pieces[pi].assigned=false;
+    var maxStockLen = 0;
+    for (var si=0;si<stocks.length;si++) {
+        stocks[si].used=false; stocks[si].pieceAssignments=[];
+        stocks[si].remainingLength=stocks[si].usableLength;
+        stocks[si].hasLastPieceWithoutSaw=false;
+        if (stocks[si].usableLength > maxStockLen) maxStockLen = stocks[si].usableLength;
+    }
+    
+    // Lower bound calculation for early stopping
+    var totalPieceLength = 0;
+    for (var pi=0;pi<pieces.length;pi++) {
+        totalPieceLength += pieces[pi].length + sawWidth;
+    }
+    var lowerBoundStocks = Math.max(1, Math.ceil(totalPieceLength / (maxStockLen || 1)));
+
+    if (preferShorterStocks) stocks.sort(function(a,b){return a.length-b.length;});
+    
+    if (useUnlimitedStock) {
+        var sg = {}; sg[profile] = stocks;
+        ffdUnlimited(pieces,stocks,gripStart,gripEnd,sawWidth,maxUniqueLabels,profile,sg,unlimitedStockLength);
+    } else {
+        optimize(pieces,stocks,gripStart,sawWidth,maxUniqueLabels,lowerBoundStocks);
+    }
+    collectResults(stocks,cuttingNests,gripStart,gripEnd,sawWidth,minOffcut);
+    
     self.postMessage({cuttingNests:cuttingNests, warnings:warnings});
 };
 
-// ── DP 0/1 Knapsack ───────────────────────────────────────────────────────────
-// Finds the EXACT optimal subset of items that maximises total piece length
-// fitting in usableLength (respecting saw cuts). Returns {pieces, waste}.
-//
-// Key insight: virtual capacity = usableLength + sawWidth, each item costs
-// (length + sawWidth). This correctly accounts for the last piece needing no
-// saw after it (the extra sawWidth in the virtual capacity absorbs it).
-//
-// For label constraint: if more unique labels exist than allowed, falls back
-// to the original backtracking which handles it exactly.
 function dpKnapsack(items, usableLength, sawWidth, maxUniqueLabels) {
     if (!items.length) return {pieces:[], waste:usableLength};
 
-    // Check whether the label constraint can bind
     var labelSet={}, labelCount=0;
     for (var i=0;i<items.length;i++) {
         if (!labelSet[items[i].label]) { labelSet[items[i].label]=1; labelCount++; }
     }
     if (labelCount > maxUniqueLabels) {
-        // Fall back to backtracking which handles label constraint exactly
         return backtrackKnapsack(items, usableLength, sawWidth, maxUniqueLabels);
     }
 
-    // Scale lengths to integers (handle up to 1 decimal place)
     var scale = 1;
     for (var i=0;i<items.length;i++) {
         var s = String(items[i].length);
@@ -1239,41 +1289,78 @@ function dpKnapsack(items, usableLength, sawWidth, maxUniqueLabels) {
     var C = Math.floor((usableLength + sawWidth) * scale);
     var sw = Math.round(sawWidth * scale);
 
-    // dp[c] = max total piece length (scaled) using at most c virtual space
+    // Grouping identical pieces by length to reduce DP state space overhead
+    var lenGroups = {};
+    for (var i=0; i<items.length; i++) {
+        var l = items[i].length;
+        var p = Math.round((l + sawWidth) * scale);
+        if (p > C) continue;
+        if (!lenGroups[l]) lenGroups[l] = { length: l, cost: p, val: Math.round(l * scale), items: [] };
+        lenGroups[l].items.push(items[i]);
+    }
+
+    var groupedItems = [];
+    for (var l in lenGroups) {
+        var g = lenGroups[l];
+        var count = g.items.length;
+        var k = 1;
+        while (count > 0) {
+            var take = Math.min(k, count);
+            groupedItems.push({
+                cost: g.cost * take,
+                val: g.val * take,
+                takeCount: take,
+                length: g.length
+            });
+            count -= take;
+            k *= 2;
+        }
+    }
+
     var dp  = new Int32Array(C + 1);
-    // par[c] = index into items[] that was placed at this state (for traceback)
     var par = new Int32Array(C + 1).fill(-1);
-    // prev[c] = previous capacity state before placing par[c]
     var prev = new Int32Array(C + 1).fill(-1);
 
-    for (var i=0;i<items.length;i++) {
-        var cost = Math.round((items[i].length + sawWidth) * scale);
+    for (var i=0;i<groupedItems.length;i++) {
+        var cost = groupedItems[i].cost;
         if (cost > C) continue;
-        // Backward scan — ensures each item used at most once
         for (var c=C; c>=cost; c--) {
-            var nv = dp[c-cost] + Math.round(items[i].length * scale);
+            var nv = dp[c-cost] + groupedItems[i].val;
             if (nv > dp[c]) { dp[c]=nv; par[c]=i; prev[c]=c-cost; }
         }
     }
 
-    // Find state with maximum total length
     var bestLen=0, bestC=0;
     for (var c=1;c<=C;c++) { if (dp[c]>bestLen) {bestLen=dp[c];bestC=c;} }
     if (bestLen===0) return {pieces:[], waste:usableLength};
 
-    // Traceback
     var selIdx=[], c=bestC;
     while (c>0 && par[c]!==-1) { selIdx.push(par[c]); c=prev[c]; }
-    selIdx.reverse();
+    
+    var requiredLengths = {};
+    for (var j=0; j<selIdx.length; j++) {
+        var gi = groupedItems[selIdx[j]];
+        if (!requiredLengths[gi.length]) requiredLengths[gi.length] = 0;
+        requiredLengths[gi.length] += gi.takeCount;
+    }
 
-    var pieces=selIdx.map(function(idx,k) {
-        return Object.assign({},items[idx],{withoutSawWidth: k===selIdx.length-1});
+    var pieces = [];
+    for (var l in requiredLengths) {
+        var req = requiredLengths[l];
+        var instances = lenGroups[l].items;
+        for (var k=0; k<req; k++) {
+            pieces.push(instances[k]);
+        }
+    }
+
+    var outPieces = pieces.map(function(pc, idx) {
+        return Object.assign({}, pc, {withoutSawWidth: idx === pieces.length-1});
     });
-    var totalLen=selIdx.reduce(function(s,idx){return s+items[idx].length;},0);
-    return {pieces:pieces, waste:usableLength-totalLen};
+
+    var totalLen=outPieces.reduce(function(s,pc){return s+pc.length;},0);
+    return {pieces:outPieces, waste:usableLength-totalLen};
 }
 
-// ── Backtracking knapsack (used when label constraint is binding) ──────────────
 function backtrackKnapsack(items, stockLength, sawWidth, maxUniqueLabels) {
     var best={pieces:[], waste:stockLength};
     function bt(start,cur,rem,labels,curLen) {
@@ -1307,7 +1394,6 @@ function backtrackKnapsack(items, stockLength, sawWidth, maxUniqueLabels) {
     return best;
 }
 
-// ── FFD using DP pricing ──────────────────────────────────────────────────────
 function runFFD(orderedPieces, stocks, gripStart, sawWidth, maxUniqueLabels) {
     for (var si=0;si<stocks.length;si++) {
         stocks[si].used=false; stocks[si].pieceAssignments=[];
@@ -1349,11 +1435,6 @@ function placePattern(bar, pieces, gripStart, sawWidth, unassigned) {
     bar.remainingLength=bar.usableLength-(pos-gripStart);
 }
 
-// ── MBS Improvement (Fleszar-Hindi 2002) ─────────────────────────────────────
-// Minimal Bin Slack: repeatedly pick the fullest open bar (smallest remaining
-// space) and try to use DP to fill that remaining space with pieces moved from
-// other bars.  A filled bar stays at 0 slack and allows the emptiest bars to
-// potentially be eliminated.  Restart whenever any bar is eliminated.
 function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
     var improved=true;
     while (improved) {
@@ -1361,14 +1442,12 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
         var used=stocks.filter(function(s){return s.used&&s.pieceAssignments.length>0;});
         if (used.length<=1) break;
 
-        // Sort: tightest (smallest remaining) first — these are the MBS targets
         used.sort(function(a,b){return a.remainingLength-b.remainingLength;});
 
         for (var ti=0;ti<used.length;ti++) {
             var target=used[ti];
-            if (target.remainingLength<=0) continue; // already perfectly packed
+            if (target.remainingLength<=0) continue;
 
-            // Collect all pieces from OTHER bars that could go into target's slack
             var donors=used.filter(function(b){return b!==target;});
             var pool=[];
             for (var di=0;di<donors.length;di++) {
@@ -1378,17 +1457,13 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
             }
             var poolPieces=pool.map(function(x){return x.assign.piece;});
 
-            // Use DP to find best subset of donor pieces that fills target's slack
-            // Space available for appending: remaining - sawWidth (need one saw to join)
             var avail=target.remainingLength-sawWidth;
             if (avail<=0) continue;
             var pat=dpKnapsack(poolPieces,avail,sawWidth,maxUniqueLabels);
             if (!pat.pieces.length) continue;
 
-            // Find which pool entries correspond to selected pieces
             var toMove=[];
-            var patIds=pat.pieces.map(function(p){return p.id;});
-            var used2=new Set ? new Set() : {};
+            var used2={};
             for (var pi2=0;pi2<pat.pieces.length;pi2++) {
                 for (var pi3=0;pi3<pool.length;pi3++) {
                     var key=pool[pi3].bar.id+':'+pool[pi3].assign.piece.id;
@@ -1401,7 +1476,6 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
             }
             if (toMove.length!==pat.pieces.length) continue;
 
-            // Commit: remove from donor bars, add to target
             var donorMap={};
             for (var mi=0;mi<toMove.length;mi++) {
                 var m=toMove[mi];
@@ -1409,8 +1483,6 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
                 if (!donorMap[barId]) donorMap[barId]={bar:m.bar,removes:[]};
                 donorMap[barId].removes.push(m.assign);
             }
-            // Calculate new remaining lengths for donor bars
-            var valid=true;
             var updates=[];
             for (var barId in donorMap) {
                 var dbar=donorMap[barId].bar;
@@ -1421,7 +1493,6 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
                 }
                 updates.push({bar:dbar, removes:removes, newRem:newRem});
             }
-            // Apply updates to donor bars
             for (var ui2=0;ui2<updates.length;ui2++) {
                 var upd=updates[ui2];
                 for (var ri2=0;ri2<upd.removes.length;ri2++) {
@@ -1436,8 +1507,7 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
                     }
                 }
             }
-            // Add moved pieces to target
-            var spaceUsed=sawWidth; // one saw to join
+            var spaceUsed=sawWidth;
             for (var mi2=0;mi2<toMove.length;mi2++) {
                 var np=toMove[mi2].newPiece;
                 target.pieceAssignments.push({
@@ -1448,12 +1518,11 @@ function mbsImprove(stocks, sawWidth, maxUniqueLabels) {
                 spaceUsed+=np.length+(np.withoutSawWidth?0:sawWidth);
             }
             target.remainingLength-=spaceUsed;
-            if (improved) break; // restart with fresh bar list
+            if (improved) break;
         }
     }
 }
 
-// ── LNS — destroy N emptiest bars and re-pack freed pieces with DP ────────────
 function lns(stocks, sawWidth, maxUniqueLabels) {
     var anyImp=true;
     while (anyImp) {
@@ -1474,18 +1543,16 @@ function lns(stocks, sawWidth, maxUniqueLabels) {
             }
             freed.sort(function(a,b){return b.length-a.length;});
 
-            // Try to fit freed pieces into remaining space of other bars using DP
             var tempRem=others.map(function(b){return b.remainingLength;});
             var plans=others.map(function(){return [];});
             var unplaced=freed.slice();
 
-            // Sort others by most remaining space first
             var order=others.map(function(_,i){return i;});
             order.sort(function(a,b){return tempRem[b]-tempRem[a];});
 
             for (var ii=0;ii<order.length&&unplaced.length>0;ii++) {
                 var oi=order[ii];
-                var avail=tempRem[oi]-sawWidth; // need saw to append
+                var avail=tempRem[oi]-sawWidth;
                 if (avail<=0) continue;
                 var pat=dpKnapsack(unplaced,avail,sawWidth,maxUniqueLabels);
                 if (!pat.pieces.length) continue;
@@ -1525,7 +1592,6 @@ function lns(stocks, sawWidth, maxUniqueLabels) {
     }
 }
 
-// ── Local search: move one piece, retry MBS+LNS ──────────────────────────────
 function localSearch(stocks, sawWidth, maxUniqueLabels) {
     var used=stocks.filter(function(s){return s.used&&s.pieceAssignments.length>0;});
     if (used.length<=1) return false;
@@ -1544,7 +1610,6 @@ function localSearch(stocks, sawWidth, maxUniqueLabels) {
                 var barB=used[bi];
                 if (barB.remainingLength<needed) continue;
 
-                // Tentative move
                 barA.pieceAssignments.splice(pi,1);
                 barA.remainingLength+=piece.length+(assign.withoutSawWidth?0:sawWidth);
                 barB.pieceAssignments.push({piece:piece,position:0,length:piece.length,
@@ -1558,7 +1623,6 @@ function localSearch(stocks, sawWidth, maxUniqueLabels) {
 
                 if (after<before) return true;
 
-                // Undo
                 barB.pieceAssignments.pop();
                 barB.remainingLength+=needed;
                 barA.pieceAssignments.splice(pi,0,assign);
@@ -1569,8 +1633,7 @@ function localSearch(stocks, sawWidth, maxUniqueLabels) {
     return false;
 }
 
-// ── Main optimiser ────────────────────────────────────────────────────────────
-function optimize(pieces, stocks, gripStart, sawWidth, maxUniqueLabels) {
+function optimize(pieces, stocks, gripStart, sawWidth, maxUniqueLabels, lowerBoundStocks) {
     function shuffle(arr) {
         var a=arr.slice();
         for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
@@ -1590,7 +1653,6 @@ function optimize(pieces, stocks, gripStart, sawWidth, maxUniqueLabels) {
         }
     }
 
-    // Phase 1: Multi-start FFD with DP pricing (20 runs)
     var byDec=pieces.slice().sort(function(a,b){return b.length-a.length;});
     var best=Infinity, bestSnap=null;
     var orderings=[byDec];
@@ -1600,21 +1662,22 @@ function optimize(pieces, stocks, gripStart, sawWidth, maxUniqueLabels) {
         var trial=clone(stocks);
         var cnt=runFFD(orderings[oi],trial,gripStart,sawWidth,maxUniqueLabels);
         if(cnt<best){best=cnt;bestSnap=trial;}
+        if(best <= lowerBoundStocks) break;
     }
     apply(stocks,bestSnap);
 
-    // Phase 2: MBS improvement (Fleszar-Hindi 2002)
-    mbsImprove(stocks,sawWidth,maxUniqueLabels);
-
-    // Phase 3: LNS
-    lns(stocks,sawWidth,maxUniqueLabels);
-
-    // Phase 4: Local search loop — move one piece then retry MBS+LNS
-    var imp=true;
-    while(imp) { imp=localSearch(stocks,sawWidth,maxUniqueLabels); }
+    if (best > lowerBoundStocks) {
+        mbsImprove(stocks,sawWidth,maxUniqueLabels);
+        lns(stocks,sawWidth,maxUniqueLabels);
+        var imp=true;
+        while(imp) { 
+            imp=localSearch(stocks,sawWidth,maxUniqueLabels); 
+            var usedCnt = stocks.filter(function(s){return s.used&&s.pieceAssignments.length>0;}).length;
+            if(usedCnt <= lowerBoundStocks) break;
+        }
+    }
 }
 
-// ── Unlimited stock (original logic) ─────────────────────────────────────────
 function ffdUnlimited(pieces,stocks,gripStart,gripEnd,sawWidth,maxUniqueLabels,profile,sg,unlimitedStockLength) {
     pieces.sort(function(a,b){return b.length-a.length;});
     var unassigned=pieces.slice();
@@ -1659,7 +1722,6 @@ function ffdUnlimited(pieces,stocks,gripStart,gripEnd,sawWidth,maxUniqueLabels,p
     }
 }
 
-// ── Collect results (no DOM access) ──────────────────────────────────────────
 function collectResults(stocks,cuttingNests,gripStart,gripEnd,sawWidth,minOffcut) {
     for(var i=0;i<stocks.length;i++) {
         var s=stocks[i];
@@ -1672,7 +1734,8 @@ function collectResults(stocks,cuttingNests,gripStart,gripEnd,sawWidth,minOffcut
         }
         var totalWaste=sawCuts*sawWidth+gripStart+gripEnd;
         var offcut=s.length-usedLen-totalWaste;
-        if(offcut<minOffcut){totalWaste+=offcut;offcut=0;}
+        if(offcut<minOffcut && !s.isUnlimitedStock){totalWaste+=Math.max(0, offcut);offcut=0;}
+        if(offcut<0) {totalWaste+=offcut;offcut=0;}
         cuttingNests.push({
             profile:s.originalStock.profile,stockLength:s.length,
             gripStart:gripStart,gripEnd:gripEnd,sawWidth:sawWidth,
@@ -1684,13 +1747,10 @@ function collectResults(stocks,cuttingNests,gripStart,gripEnd,sawWidth,minOffcut
 }
 `;
 
-function _getNestingWorker() {
-    if (_nestingWorker) return _nestingWorker;
+function _createNewWorker() {
     var blob = new Blob([_WORKER_CODE], { type: 'application/javascript' });
-    _nestingWorker = new Worker(URL.createObjectURL(blob));
-    return _nestingWorker;
+    return new Worker(URL.createObjectURL(blob));
 }
-
 function _setNestingUI(running) {
     var spinner = document.getElementById('nesting-spinner');
     var btn = document.getElementById('optimize-btn');
@@ -1727,8 +1787,20 @@ function renderCuttingNests(nests) {
         return el;
     };
   
-    const updateRemaining = parentID => {
-        const idx = remaining.findIndex(i => i.id === parentID);
+    const updateRemaining = (parentID, label, profile) => {
+        let idx = remaining.findIndex(i => i.id === parentID);
+        // Fallback: when pieces were imported from a cut-opt result, all cuts of the
+        // same label share the *first* matching pieceItem's id.  Once that row is
+        // exhausted and removed, subsequent calls with the same id return -1.
+        // We then fall back to finding any remaining row with the same label+profile
+        // so that duplicate rows (same label, split across multiple CSV lines) are
+        // correctly drained in sequence.
+        if (idx === -1 && label !== undefined) {
+            idx = remaining.findIndex(i =>
+                String(i.label) === String(label) &&
+                (profile === undefined || String(i.profile) === String(profile))
+            );
+        }
         if (idx === -1) return;
         remaining[idx].amount--;
         if (remaining[idx].amount <= 0) remaining.splice(idx, 1);
@@ -1771,7 +1843,7 @@ function renderCuttingNests(nests) {
             const node = createElem('div', 'piece-item col s4 m3 l2');
             node.innerHTML = `
                 <div class="chip" style="background-color:${item.color}">
-                    <span class="white-text">${item.count}×${item.length} mm</span>
+                    <span class="white-text">${item.count}أ—${item.length} mm</span>
                 </div>
             `;
             list.appendChild(node);
@@ -1923,7 +1995,7 @@ function renderCuttingNests(nests) {
             totalPieceLength += p.piece.length * count;
             // Update remaining pieces based on unique nest counts
             for (let j = 0; j < count; j++) {
-                updateRemaining(p.piece.parentID);
+                updateRemaining(p.piece.parentID, p.piece.label, nest.profile);
             }
         });
     });
@@ -2233,7 +2305,7 @@ function renderCuttingNests(nests) {
     const exportButtonContainer = createElem('div', 'export-button-container center-align');
     const exportButton = createElem('a', 'waves-effect waves-light btn-large deep-purple');
     exportButton.innerHTML = '<i class="material-icons left">file_download</i>Export to PDF';
-    exportButton.onclick = () => generatePDF(uniqueNests);
+    exportButton.onclick = () => generatePDF(uniqueNests, firstNestNumber);
 
     // Create a custom checkbox container that won't be affected by Materialize
     const checkboxContainer = createElem('div', 'custom-checkbox-container');
@@ -2271,9 +2343,14 @@ function renderCuttingNests(nests) {
 }
 
 // Function to generate PDF from the nesting data
-function generatePDF(uniqueNests) {
+function generatePDF(uniqueNests, firstNestNumber) {
     // Get the jsPDF constructor from the window.jspdf object
     const { jsPDF } = window.jspdf;
+    
+    // firstNestNumber is passed in from renderCuttingNests so it reflects
+    // the number used when the nests were rendered, not the already-advanced
+    // value that the input field holds after rendering updates it.
+    firstNestNumber = firstNestNumber || 1;
     
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -2333,7 +2410,7 @@ function generatePDF(uniqueNests) {
         
         // Create data for this profile
         const profileData = profileNests.map((uniqueNest, i) => [
-            `${nestCounter + uniqueNests.findIndex(n => n === uniqueNest)}`,
+            `${firstNestNumber + uniqueNests.findIndex(n => n === uniqueNest)}`,
             `${uniqueNest.nest.stockLength} mm`,
             uniqueNest.nest.pieceAssignments.length.toString(),
             `${Math.round(uniqueNest.nest.offcut)} mm`,
@@ -2474,7 +2551,7 @@ function generatePDF(uniqueNests) {
         
         // Add nest title with quantity
         doc.setFontSize(14);
-        doc.text(`Nest #${nestCounter + uniqueNest.originalIndex} - Profile: ${pat.profile}${count > 1 ? ` (Qty: ${count})` : ' (Qty: 1)'}`, margin, yPosition);
+        doc.text(`Nest #${firstNestNumber + uniqueNest.originalIndex} - Profile: ${pat.profile}${count > 1 ? ` (Qty: ${count})` : ' (Qty: 1)'}`, margin, yPosition);
         yPosition += 8;
         
         // Add nest stats
@@ -2935,8 +3012,10 @@ function exportFncNest() {
     const labels = getUniqueNestLabels();
 
     let piecesBlocks = '';
-    Object.entries(labels).forEach(([label, data]) => {
-        if(pieceItemsFromFiles[label] === undefined) return; // Skip if label not found in pieceItemsFromFiles
+    Object.entries(labels)
+    .sort(([, a], [, b]) => b.isUniqueProfile - a.isUniqueProfile)
+    .forEach(([label, data]) => {
+        if(pieceItemsFromFiles[label] === undefined) return;
         piecesBlocks += createFNC(pieceItemsFromFiles[label][1], data.count, data.isUniqueProfile) + '\n';
     });
 
@@ -2951,6 +3030,8 @@ function exportFncNest() {
         });
     }
 
+    // Fallback if nest counter is not a number or undefined, set it to 1
+    if (nestCounter === undefined || isNaN(nestCounter)) nestCounter = 1;
     let nestsBlocks = createNestBlocks(nestCounter, missingPieces);
 
     // Create download link with nesting data
@@ -2962,6 +3043,67 @@ function exportFncNest() {
     link.click();
     document.body.removeChild(link);
 }
+
+// Expose cuttingNests getter for external modules
+window.getCuttingNests = function() {
+    return cuttingNests;
+};
+
+function exportCamNest() {
+    if (typeof saveCAMSettings === 'function') {
+        saveCAMSettings();
+    }
+
+    // If no nesting is present return with error
+    if (!cuttingNests || cuttingNests.length === 0) {
+        M.toast({html: 'No Nesting to Export!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
+
+    if (checkForMissingProfile() === true) {
+        M.toast({html: 'Some Piece Profiles are Missing!', classes: 'rounded toast-error', displayLength: 2000});
+        return;
+    }
+
+    createPieceItemsFromFiles();
+
+    if (nestCounter === undefined || isNaN(nestCounter)) nestCounter = 1;
+
+    try {
+        const camContent = createCAMNestContentFromNests(cuttingNests, pieceItemsFromFiles, filePairs, pieceItems, nestCounter);
+
+        const blob = new Blob([camContent], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const fileName = (typeof CAMJobNumber !== 'undefined' && CAMJobNumber ? `${CAMJobNumber}.cam` : 'JOB-01.cam');
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        M.toast({
+            html: `Exported ${fileName} successfully!`,
+            classes: 'rounded toast-success',
+            displayLength: 3000
+        });
+
+        const modalEl = document.getElementById('ExportCAMNestModal');
+        if (modalEl) {
+            const modalInst = M.Modal.getInstance(modalEl);
+            if (modalInst) modalInst.close();
+        }
+    } catch (err) {
+        M.toast({
+            html: `CAM Export error: ${err.message}`,
+            classes: 'rounded toast-error',
+            displayLength: 4000
+        });
+        console.error('CAM export error:', err);
+    }
+}
+
+window.exportCamNest = exportCamNest;
 
 function getMissingPieces() {
     // Create a set of labels from filePairs for quick lookup
@@ -3908,4 +4050,429 @@ function createNewNest(profile, barLength) {
     html: `Added ${barLength}mm stock for ${profile}`, 
     classes: 'rounded toast-success' 
   });
+}
+
+// Export pieces as cut-optimisation CSV
+// Format (no headers):  length,0,qty,profile,0,label,,,,,0,0,0,0,,
+function downloadCutOptCSV() {
+    if (!pieceItems || pieceItems.length === 0) {
+        M.toast({ html: 'No piece items to export!', classes: 'rounded toast-warning', displayLength: 2000 });
+        return;
+    }
+
+    const lines = pieceItems.map(function(p) {
+        var profile = String(p.profile || '').replace(/,/g, ' ');
+        var label   = String(p.label || p.length).replace(/,/g, ' ');
+        return p.length + ',0,' + p.amount + ',' + profile + ',0,' + label + ',,,,,0,0,0,0,,';
+    });
+
+    var blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'cut_optimization_pieces.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    M.toast({ html: 'Pieces exported as CSV!', classes: 'rounded toast-success', displayLength: 2000 });
+}
+
+// Minimal XLSX reader
+
+function _u16le(b, p) { return b[p] | (b[p+1] << 8); }
+function _u32le(b, p) { return ((b[p] | (b[p+1]<<8) | (b[p+2]<<16) | (b[p+3]<<24)) >>> 0); }
+
+// Only extracts the two XML files we need.
+function _zipEntries(bytes) {
+    var entries = {};
+    var pos = 0;
+    var needed = { 'xl/sharedStrings.xml': true, 'xl/worksheets/sheet1.xml': true };
+
+    while (pos < bytes.length - 30) {
+        // Local file header signature PK\x03\x04
+        if (!(bytes[pos] === 0x50 && bytes[pos+1] === 0x4B &&
+              bytes[pos+2] === 0x03 && bytes[pos+3] === 0x04)) {
+            pos++;
+            continue;
+        }
+
+        var compress = _u16le(bytes, pos + 8);
+        var csize    = _u32le(bytes, pos + 18);
+        var fnLen    = _u16le(bytes, pos + 26);
+        var exLen    = _u16le(bytes, pos + 28);
+        var fname    = '';
+        for (var i = 0; i < fnLen; i++) fname += String.fromCharCode(bytes[pos + 30 + i]);
+
+        var dataStart = pos + 30 + fnLen + exLen;
+
+        if (needed[fname]) {
+            entries[fname] = { compress: compress, data: bytes.slice(dataStart, dataStart + csize) };
+        }
+
+        // Advance past this entry; if csize is 0 the real size is in the data descriptor
+        if (csize === 0) {
+            // Scan for next PK signature
+            pos = dataStart + 1;
+        } else {
+            pos = dataStart + csize;
+        }
+
+        // Early exit once we have both files
+        if (entries['xl/sharedStrings.xml'] && entries['xl/worksheets/sheet1.xml']) break;
+    }
+    return entries;
+}
+
+// Decompress a raw-deflate Uint8Array â†’ string (UTF-8)
+async function _inflate(bytes) {
+    var ds     = new DecompressionStream('deflate-raw');
+    var writer = ds.writable.getWriter();
+    var reader = ds.readable.getReader();
+
+    // Write + close must be sequenced properly
+    var writePromise = writer.write(bytes).then(function() { return writer.close(); });
+
+    var chunks = [];
+    var reading = true;
+    while (reading) {
+        var result = await reader.read();
+        if (result.done) { reading = false; } else { chunks.push(result.value); }
+    }
+    await writePromise;
+
+    var total  = chunks.reduce(function(s, c) { return s + c.length; }, 0);
+    var merged = new Uint8Array(total);
+    var off    = 0;
+    for (var c of chunks) { merged.set(c, off); off += c.length; }
+    return new TextDecoder().decode(merged);
+}
+
+// Parse an XLSX ArrayBuffer â†’ array-of-arrays (rows أ— cells)
+async function parseXlsx(arrayBuffer) {
+    var bytes   = new Uint8Array(arrayBuffer);
+    var entries = _zipEntries(bytes);
+
+    if (!entries['xl/worksheets/sheet1.xml']) {
+        throw new Error('Cannot find sheet1.xml inside the XLSX. Is this a valid .xlsx file?');
+    }
+
+    // Decompress or decode each needed file
+    async function getText(entry) {
+        if (!entry) return '';
+        if (entry.compress === 0) return new TextDecoder().decode(entry.data);
+        if (entry.compress === 8) return await _inflate(entry.data);
+        throw new Error('Unsupported ZIP compression method: ' + entry.compress);
+    }
+
+    var ssXml   = await getText(entries['xl/sharedStrings.xml']);
+    var wsXml   = await getText(entries['xl/worksheets/sheet1.xml']);
+
+    // Parse shared strings
+    var sharedStrings = [];
+    if (ssXml) {
+        var ssDoc = new DOMParser().parseFromString(ssXml, 'application/xml');
+        ssDoc.querySelectorAll('si').forEach(function(si) {
+            var parts = Array.from(si.querySelectorAll('t')).map(function(t) { return t.textContent || ''; });
+            sharedStrings.push(parts.join(''));
+        });
+    }
+
+    // Parse worksheet rows
+    var rows = [];
+    var wsDoc = new DOMParser().parseFromString(wsXml, 'application/xml');
+    wsDoc.querySelectorAll('row').forEach(function(rowEl) {
+        var cells = [];
+        rowEl.querySelectorAll('c').forEach(function(c) {
+            var t   = c.getAttribute('t');
+            var vEl = c.querySelector('v');
+            var val = vEl ? (vEl.textContent || '') : '';
+            if (t === 's' && val !== '') val = sharedStrings[parseInt(val, 10)] || '';
+            cells.push(val.trim());
+        });
+        rows.push(cells);
+    });
+
+    return rows;
+}
+
+// Parse cuts column
+function _parseCuts(str) {
+    var result = [];
+    var re = /\(\s*([\d.]+)\s*;\s*([^)]+?)\s*\)/g;
+    var m;
+    while ((m = re.exec(str)) !== null) {
+        result.push({ length: parseFloat(m[1]), label: m[2].trim() });
+    }
+    return result;
+}
+
+// Convert parsed XLSX rows â†’ cuttingNests objects
+function _buildNestsFromRows(rows) {
+    if (!rows || rows.length < 2) return [];
+
+    // Detect and skip header row
+    var firstRow = rows[0].map(function(c) { return c.toLowerCase(); });
+    var hasHeader = firstRow.some(function(c) { return c === 'length' || c === 'material' || c === 'cuts'; });
+    var dataRows  = hasHeader ? rows.slice(1) : rows;
+
+    // Column index detection (default positional)
+    var iLen = 0, iMat = 1, iQty = 2, iCuts = 5;
+    if (hasHeader) {
+        firstRow.forEach(function(c, i) {
+            if (c === 'length')   iLen  = i;
+            if (c === 'material') iMat  = i;
+            if (c === 'quantity') iQty  = i;
+            if (c === 'cuts')     iCuts = i;
+        });
+    }
+
+    var gripStart = parseFloat(document.getElementById('grip-start').value) || 0;
+    var gripEnd   = parseFloat(document.getElementById('grip-end').value)   || 0;
+    var sawWidth  = parseFloat(document.getElementById('saw-width').value)  || 0;
+
+    var nests = [];
+
+    dataRows.forEach(function(row) {
+        if (!row.length || row.every(function(c) { return c === ''; })) return;
+
+        var stockLength = parseFloat(row[iLen]);
+        var profile     = String(row[iMat] || '').trim().replace(/(\d)\*(\d)/g, '$1X$2').replace(/\s+/g, '-');
+        var quantity    = parseInt(row[iQty], 10) || 1;
+        var cutsStr     = String(row[iCuts] || '');
+
+        if (!profile || isNaN(stockLength) || stockLength <= 0) return;
+
+        var cuts = _parseCuts(cutsStr);
+
+        var assignments = cuts.map(function(cut) {
+            // Try to match back to an existing pieceItem by profile+label, then profile+length
+            var match = null;
+            if (pieceItems) {
+                match = pieceItems.find(function(p) {
+                    return String(p.profile) === profile && String(p.label) === String(cut.label);
+                }) || pieceItems.find(function(p) {
+                    return String(p.profile) === profile && Number(p.length) === Number(cut.length);
+                });
+            }
+            var color    = match ? match.color : stringToColor(cut.label);
+            var parentID = match ? match.id    : null;
+            return {
+                label  : cut.label,
+                length : cut.length,
+                piece  : {
+                    label        : cut.label,
+                    length       : cut.length,
+                    color        : color,
+                    parentID     : parentID,
+                    originalPiece: match || null
+                }
+            };
+        });
+
+        for (var q = 0; q < quantity; q++) {
+            var nest = {
+                profile     : profile,
+                stockLength : stockLength,
+                gripStart   : gripStart,
+                gripEnd     : gripEnd,
+                sawWidth    : sawWidth,
+                pieceAssignments : JSON.parse(JSON.stringify(assignments)),
+                offcut      : 0,
+                waste       : 0,
+                hasLastPieceWithoutSaw: false
+            };
+            recomputeNestStats(nest);
+            nests.push(nest);
+        }
+    });
+
+    return nests;
+}
+
+// HTML onchange handler for the Cutting Optimization result input
+async function importCutOptResult(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    event.target.value = ''; // allow re-upload of same file
+
+    try {
+        var buffer = await file.arrayBuffer();
+        var rows   = await parseXlsx(buffer);
+
+        if (!rows || rows.length === 0) {
+            M.toast({ html: 'Could not read data from file!', classes: 'rounded toast-error', displayLength: 3000 });
+            return;
+        }
+
+        var nests = _buildNestsFromRows(rows);
+
+        if (!nests || nests.length === 0) {
+            M.toast({ html: 'No valid nests found in file. Check format.', classes: 'rounded toast-warning', displayLength: 3000 });
+            return;
+        }
+
+        cuttingNests = nests;
+        nestCounter = Number(document.getElementById('first-nest-number').value) ||
+                      Number(localStorage.getItem('first-nest-number')) || 1;
+        renderCuttingNests(cuttingNests);
+        cuttingNestsDiv.classList.remove('hide');
+        downloadOffcutsBtn.classList.remove('hide');
+        acceptNestBtn.classList.remove('hide');
+        manualEditBtn.classList.remove('hide');
+        M.Tabs.init(document.querySelectorAll('#nesting-tabs'));
+
+        M.toast({
+            html: 'Imported ' + nests.length + ' nest' + (nests.length !== 1 ? 's' : '') + ' from cutting optimization result!',
+            classes: 'rounded toast-success',
+            displayLength: 3000
+        });
+
+    } catch (err) {
+        M.toast({ html: 'Import failed: ' + err.message, classes: 'rounded toast-error', displayLength: 5000 });
+    }
+}
+
+// CAM file import parser
+function parseCamFile(text) {
+    var nests = [];
+    var barSections = text.split('_BAR_');
+
+    for (var i = 1; i < barSections.length; i++) {
+        var section = barSections[i];
+
+        function getVal(key) {
+            var re = new RegExp('^' + key + ':(.+)$', 'm');
+            var m  = section.match(re);
+            return m ? m[1].trim().replace(/\r$/, '') : null;
+        }
+
+        var rawProfile  = getVal('BAR_PRO') || '';
+        var grade       = getVal('BAR_MAT') || '';
+        var stockLength = parseFloat(getVal('BAR_LEN') || '0');
+        var barQty      = parseInt(getVal('BAR_QTY')  || '1', 10);
+        var gripEnd  = parseFloat(getVal('BAR_SC')  || '0');
+        var gripStart   = parseFloat(getVal('BAR_SP')  || '0');
+        var sawWidth     = parseFloat(getVal('BAR_SL')  || '0');
+
+        var profile = rawProfile
+            .replace(/(\d)\*(\d)/g, '$1X$2')
+            .replace(/\s+/g, '-');
+
+        if (!profile || isNaN(stockLength) || stockLength <= 0) continue;
+
+        var assignments = [];
+        var itemBlockMatch = section.match(/\[ITEM\]([\s\S]*?)(?=\[POS_ITEM\]|\[[A-Z_]+\]|;\s*(?:OpenSteel|opensteel|STEEL)|;|$)/);
+
+        if (itemBlockMatch) {
+            var itemLines = itemBlockMatch[1].split('\n');
+            for (var j = 0; j < itemLines.length; j++) {
+                var line = itemLines[j].trim().replace(/\r$/, '');
+                if (!line || line.charAt(0) === ';') continue;
+                if (line.charAt(0) === '[') break;
+
+                var firstComma  = line.indexOf(',');
+                var secondComma = line.indexOf(',', firstComma + 1);
+                if (firstComma === -1 || secondComma === -1) continue;
+
+                var position = line.substring(firstComma + 1, secondComma).trim();
+                var rest     = line.substring(secondComma + 1).trim().split(/\s+/);
+
+                var pieceLength = parseFloat(rest[0]);
+                var pieceQty    = parseInt(rest[1] || '1', 10);
+
+                if (isNaN(pieceLength) || pieceLength <= 0) continue;
+
+                var label = position;
+                var match = null;
+                if (pieceItems) {
+                    match = pieceItems.find(function(p) {
+                        return String(p.profile) === profile && String(p.label) === label;
+                    }) || pieceItems.find(function(p) {
+                        return String(p.profile) === profile && Number(p.length) === Number(pieceLength);
+                    });
+                }
+
+                var color = match ? match.color : stringToColor(label);
+
+                for (var q = 0; q < pieceQty; q++) {
+                    assignments.push({
+                        label  : label,
+                        length : pieceLength,
+                        piece  : {
+                            label        : label,
+                            length       : pieceLength,
+                            color        : color,
+                            profile      : profile,
+                            parentID     : match ? match.id : null,
+                            originalPiece: match || null
+                        }
+                    });
+                }
+            }
+        }
+
+        for (var n = 0; n < barQty; n++) {
+            var nest = {
+                profile          : profile,
+                grade            : grade,
+                stockLength      : stockLength,
+                gripStart        : gripStart,
+                gripEnd          : gripEnd,
+                sawWidth         : sawWidth,
+                pieceAssignments : JSON.parse(JSON.stringify(assignments)),
+                offcut           : 0,
+                waste            : 0,
+                hasLastPieceWithoutSaw: false
+            };
+            recomputeNestStats(nest);
+            nests.push(nest);
+        }
+    }
+
+    return nests;
+}
+
+async function importCamFile(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    event.target.value = '';
+
+    try {
+        var text  = await file.text();
+        var nests = parseCamFile(text);
+
+        if (!nests || nests.length === 0) {
+            M.toast({
+                html    : 'No valid nests found in CAM file. Check that _BAR_ sections exist.',
+                classes : 'rounded toast-warning',
+                displayLength: 3500
+            });
+            return;
+        }
+
+        cuttingNests = nests;
+        // Read nestCounter before renderCuttingNests updates the UI field, to make sure we use the correct starting number
+        nestCounter = Number(document.getElementById('first-nest-number').value) ||
+                      Number(localStorage.getItem('first-nest-number')) || 1;
+        renderCuttingNests(cuttingNests);
+        cuttingNestsDiv.classList.remove('hide');
+        downloadOffcutsBtn.classList.remove('hide');
+        acceptNestBtn.classList.remove('hide');
+        manualEditBtn.classList.remove('hide');
+        M.Tabs.init(document.querySelectorAll('#nesting-tabs'));
+
+        M.toast({
+            html    : 'Imported ' + nests.length + ' nest' + (nests.length !== 1 ? 's' : '') + ' from ' + file.name,
+            classes : 'rounded toast-success',
+            displayLength: 3000
+        });
+
+    } catch (err) {
+        M.toast({
+            html    : 'CAM import failed: ' + err.message,
+            classes : 'rounded toast-error',
+            displayLength: 5000
+        });
+    }
 }

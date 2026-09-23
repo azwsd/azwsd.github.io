@@ -15,16 +15,21 @@ function drawContours() {
     for (dataLine of contourData) {
         currentView = dataLine[0];
 
-        if(currentContour != dataLine[9]) {
-            currentContour = dataLine[9];
+        if (currentContour != dataLine[11]) {
+            currentContour = dataLine[11];
             isFirstIteration = true;
+            arcLine = 0;
+            arcData = [];
+            arcType = '';
+            rTemp = undefined;
+            notchTool = '';
         }
 
-        if(isFirstIteration) {
+        if (isFirstIteration) {
             firstX = dataLine[1];
             firstY = dataLine[3];
         }
-        else if(!isFirstIteration && dataLine[1] == firstX && dataLine[3] == firstY) resetIteration = true;
+        else if (!isFirstIteration && dataLine[1] == firstX && dataLine[3] == firstY) resetIteration = true;
 
         // Skip drawing the line if the face has changed
         if (prevView !== null && prevView !== currentView) {
@@ -43,7 +48,7 @@ function drawContours() {
             isFirstIteration = false;
             continue;
         }
-        else if(isFirstIteration && dataLine[4] != 0) {
+        else if (isFirstIteration && dataLine[4] != 0) {
             fX = dataLine[1];
             fY = dataLine[3];
             rTemp = dataLine[4];
@@ -62,22 +67,22 @@ function drawContours() {
         if (arcLine == 1) notchTool = dataLine[10];
 
         //Check if the line is an arc and stores it in arcData
-        if(dataLine[4] != 0 && arcLine == 0) {
+        if (dataLine[4] != 0 && arcLine == 0) {
             fX = dataLine[1];
             fY = dataLine[3];
             rTemp = dataLine[4];
             arcLine++;
             arcData.push(fX, fY);
         }
-        else if(dataLine[4] != 0 && arcLine == 1) {
+        else if (dataLine[4] != 0 && arcLine == 1) {
             sX = dataLine[1];
             sY = dataLine[3];
             r = dataLine[4];
             arcLine++;
             arcData.push(sX, sY, r);
-            continue; 
+            continue;
         }
-        else if(dataLine[4] == 0 && arcLine == 1) {
+        else if (dataLine[4] == 0 && arcLine == 1) {
             eX = dataLine[1];
             eY = dataLine[3];
             cX = dataLine[1];
@@ -85,7 +90,7 @@ function drawContours() {
             arcData.push(cX, cY, rTemp, eX, eY, notchTool);
             arcType = 'partial';
         }
-        else if(dataLine[4] == 0 && arcLine == 2) {
+        else if (dataLine[4] == 0 && arcLine == 2) {
             eX = dataLine[1];
             eY = dataLine[3];
             arcLine = 0;
@@ -93,11 +98,11 @@ function drawContours() {
             if (notchTool == '') notchTool = 'w';
             arcData.push(eX, eY, notchTool);
         }
-        else if(dataLine[4] != 0 && arcLine == 2) {
+        else if (dataLine[4] != 0 && arcLine == 2) {
             arcLine++;
             continue;
         }
-        else if(dataLine[4] == 0 && arcLine == 3){
+        else if (dataLine[4] == 0 && arcLine == 3) {
             eX = dataLine[1];
             eY = dataLine[3];
             arcLine = 0;
@@ -105,7 +110,7 @@ function drawContours() {
             arcData.push(eX, eY);
         }
 
-        if(resetIteration) {
+        if (resetIteration) {
             resetIteration = false;
             isFirstIteration = true;
         }
@@ -122,11 +127,11 @@ function drawContours() {
             [eX, eY] = transformCoordinates(view, eX, eY, canvasWidth, canvasHeight);
             const r = Math.abs(arcData[4]);
 
-            if(sX == eX && sY == eY) {
+            if (sX == eX && sY == eY) {
                 [cX, cY] = transformCoordinates(view, cX, cY, canvasWidth, canvasHeight);
                 [cX, cY] = [((sX + cX) / 2), (sY + cY) / 2];
                 hole = new Konva.Circle({
-                    x: cX, 
+                    x: cX,
                     y: cY,
                     radius: r,
                     stroke: 'black',
@@ -154,8 +159,8 @@ function drawContours() {
                 isFirstIteration = true;
             }
             else {
-                let isClockwise = arcData[4] > 0 ? false : true;
-                [cX, cY] = calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool, view); //Get center point correctly
+                let isClockwise = resolveArcDirection(arcData[4]);
+                [cX, cY] = calcCenter(sX, sY, null, null, eX, eY, r, isClockwise, notchTool, view); //Get center point correctly
                 let startAngle = calcAngle(sX, sY, cX, cY);
                 let endAngle = calcAngle(eX, eY, cX, cY);
 
@@ -163,22 +168,22 @@ function drawContours() {
                 let rotationAngle = isClockwise ? startAngle : endAngle;
 
                 let arc = new Konva.Arc({
-                x: cX,
-                y: cY,
-                innerRadius: r,
-                outerRadius: r,
-                angle: arcAngle,
-                stroke: 'black',
-                rotation: rotationAngle,
-                clockwise: false,
-                strokeWidth: 3,
-                name: 'contour-arc',
-                snapPoints : [
-                    {cX, cY}
-                ],
+                    x: cX,
+                    y: cY,
+                    innerRadius: r,
+                    outerRadius: r,
+                    angle: arcAngle,
+                    stroke: 'black',
+                    rotation: rotationAngle,
+                    clockwise: false,
+                    strokeWidth: 3,
+                    name: 'contour-arc',
+                    snapPoints: [
+                        { cX, cY }
+                    ],
                 });
                 addSnapIndicator(cX, cY, view);
-        
+
                 arc.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
                 layer.add(arc);
                 layer.batchDraw();
@@ -186,7 +191,7 @@ function drawContours() {
 
             prevX = arcData[5];
             prevY = arcData[6];
-        
+
             arcData = [];
             arcType = '';
             arcLine = 0;
@@ -195,25 +200,24 @@ function drawContours() {
 
         if (arcData.length !== 0 && arcType === 'full') {
             //Get center point correctly
-            let cX = arcData[2];
-            let cY = arcData[3];
             let sX = arcData[0];
             let sY = arcData[1];
             let eX = arcData[5];
             let eY = arcData[6];
-            [cX, cY] = transformCoordinates(view, cX, cY, canvasWidth, canvasHeight);
+            let notchTool = 'w'; // Fallback
             [sX, sY] = transformCoordinates(view, sX, sY, canvasWidth, canvasHeight);
             [eX, eY] = transformCoordinates(view, eX, eY, canvasWidth, canvasHeight);
-            let isClockwise = arcData[4] > 0 ? true : false;
+            let isClockwise = resolveArcDirection(arcData[4]);
             const r = Math.abs(arcData[4]);
-        
+            let [cX, cY] = calcCenter(sX, sY, null, null, eX, eY, r, isClockwise, notchTool, view);
+
             //Compute start and end angles in degrees
             let startAngle = calcAngle(sX, sY, cX, cY);
             let endAngle = calcAngle(eX, eY, cX, cY);
-            
+
             let arcAngle = calcArcAngle(startAngle, endAngle, isClockwise);
             let rotationAngle = isClockwise ? startAngle : endAngle;
-            
+
             let arc = new Konva.Arc({
                 x: cX,
                 y: cY,
@@ -221,29 +225,29 @@ function drawContours() {
                 outerRadius: r,
                 angle: arcAngle,
                 stroke: 'black',
-                rotation: rotationAngle, 
+                rotation: rotationAngle,
                 clockwise: true,
                 strokeWidth: 3,
                 name: 'contour-arc',
-                snapPoints : [
-                    {cX, cY}
+                snapPoints: [
+                    { cX, cY }
                 ],
             });
             addSnapIndicator(cX, cY, view);
             arc.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
             layer.add(arc);
             layer.batchDraw();
-            
+
             prevX = arcData[5];
             prevY = arcData[6];
-        
+
             arcData = [];
             arcType = '';
             arcLine = 0;
             continue;
         }
-        
-        
+
+
         //Apply transformations based on the view
         [tPrevX, tPrevY] = transformCoordinates(view, prevX, prevY, canvasWidth, canvasHeight);
         [tX, tY] = transformCoordinates(view, dataLine[1], dataLine[3], canvasWidth, canvasHeight);
@@ -311,9 +315,9 @@ function drawHoles() {
                 rotation: -dataLine[10], // Rotate the slot
                 offsetX: r,
                 offsetY: slotHeight - r,
-                name: `circle-${index}`, 
-                snapPoints : [
-                    {tX, tY}
+                name: `circle-${index}`,
+                snapPoints: [
+                    { tX, tY }
                 ]
             });
 
@@ -344,10 +348,9 @@ function drawHoles() {
             //create snap indicator
             addSnapIndicator(tX, tY, view);
         }
-        else
-        {
+        else {
             hole = new Konva.Circle({
-                x: tX, 
+                x: tX,
                 y: tY,
                 radius: r,
                 stroke: 'black',
@@ -381,11 +384,11 @@ function changeHoleColor(holeDiv) {
     for (const dataLine of holeData) {
         let layer = layers[dataLine[0] + '-view'];
         let holes = layer.find(node => node instanceof Konva.Circle);
-        holes.forEach(hole => {hole.stroke('black')});
+        holes.forEach(hole => { hole.stroke('black') });
         let Rectangles = layer.find(node => node instanceof Konva.Rect);
-        Rectangles.forEach(hole => {hole.stroke('black')});
+        Rectangles.forEach(hole => { hole.stroke('black') });
     }
-    document.querySelectorAll('.holeCard').forEach(card => {card.classList.remove('selected-file');}); //Removes green selection boarder from all hole card elements
+    document.querySelectorAll('.holeCard').forEach(card => { card.classList.remove('selected-file'); }); //Removes green selection boarder from all hole card elements
 
     let index = holeDiv.dataset.index;
     let view = holeDiv.dataset.view;
@@ -402,7 +405,7 @@ function enableSlotInputs() {
     for (inputId of slotInputIds) {
         const input = document.getElementById(inputId);
         const container = input?.closest('.input-group');
-        
+
         if (input && container) {
             input.disabled = false;
             input.style.opacity = '1';
@@ -416,7 +419,7 @@ function disableSlotInputs() {
     for (inputId of slotInputIds) {
         const input = document.getElementById(inputId);
         const container = input?.closest('.input-group');
-        
+
         if (input && container) {
             input.disabled = true;
             input.value = '0.00'; // Clear the value
@@ -428,13 +431,13 @@ function disableSlotInputs() {
 }
 
 //Disable or enable slot input depending on hole type
-document.addEventListener('DOMContentLoaded', function(){
-    function slotHandler (target) {
+document.addEventListener('DOMContentLoaded', function () {
+    function slotHandler(target) {
         if (target.value.trim() === 'sl') enableSlotInputs();
         else disableSlotInputs();
     }
     slotHandler(this.getElementById('holeTypeSelect'));
-    document.getElementById('holeTypeSelect').addEventListener('change', (event) => {slotHandler(event.target)});
+    document.getElementById('holeTypeSelect').addEventListener('change', (event) => { slotHandler(event.target) });
 });
 
 function getInputValue(inputId) {
@@ -444,11 +447,11 @@ function getInputValue(inputId) {
 
 function addHole() {
     if (filePairs.size === 0) {
-        M.toast({html: 'No Files Loaded!', classes: 'rounded toast-warning', displayLength: 2000});
+        M.toast({ html: 'No Files Loaded!', classes: 'rounded toast-warning', displayLength: 2000 });
         return;
     }
-    if(!selectedFile) {
-        M.toast({html: 'No fFile Selected!', classes: 'rounded toast-warning', displayLength: 2000});
+    if (!selectedFile) {
+        M.toast({ html: 'No fFile Selected!', classes: 'rounded toast-warning', displayLength: 2000 });
         return;
     }
     let holeLine = '';
@@ -465,19 +468,29 @@ function addHole() {
 
     // Check if any required values are empty/invalid
     if (holeType === 'sl' && (isNaN(slotWidth) || isNaN(slotHeight) || isNaN(slotAngle))) {
-        M.toast({html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000});
+        M.toast({ html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000 });
         return;
     }
     if (!view || isNaN(xPos) || !dimRef || isNaN(yPos) || isNaN(diameter) || isNaN(depth)) {
-        M.toast({html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000});
+        M.toast({ html: 'Please fill all fields!', classes: 'rounded toast-warning', displayLength: 2000 });
         return;
     }
 
-    if (holeType === 'sl')  holeLine = `BO\n  ${view}  ${xPos}${dimRef}  ${yPos}  ${diameter}  ${depth}l  ${slotWidth}  ${slotHeight}  ${slotAngle}`;
+    if (holeType === 'sl') holeLine = `BO\n  ${view}  ${xPos}${dimRef}  ${yPos}  ${diameter}  ${depth}l  ${slotWidth}  ${slotHeight}  ${slotAngle}`;
     else holeLine = `BO\n  ${view}  ${xPos}${dimRef}  ${yPos}${holeType}  ${diameter}  ${depth}`;
-    holeData.push([view, xPos, dimRef, yPos, holeType, diameter, depth, 'l', slotWidth, slotHeight, slotAngle]);
-
-    filePairs.set(selectedFile, filePairs.get(selectedFile).replace('EN', holeLine + '\nEN'));
+    // holeData rebuilt during forced re-parse
+    
+    const lines = filePairs.get(selectedFile).split('\n');
+    let enIndex = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].trim() === 'EN') { enIndex = i; break; }
+    }
+    if (enIndex === -1) {
+        M.toast({ html: 'Could not add hole: no EN marker found in file', classes: 'rounded toast-error', displayLength: 2000 });
+        return;
+    }
+    lines.splice(enIndex, 0, ...holeLine.split('\n'));
+    filePairs.set(selectedFile, lines.join('\n'));
 
     document.querySelector('#files .selected-file').click();
 }
@@ -486,7 +499,7 @@ function addHole() {
 function drawMarks() {
     let currentView = null;
     let prevX, prevY;
-    
+
     for (dataLine of marksData) {
         currentView = dataLine[0];
         let view = currentView + '-view';
@@ -525,16 +538,16 @@ function drawMarks() {
 
             prevX = dataLine[1];
             prevY = dataLine[3];
-    
+
             mark.strokeScaleEnabled(false); //Prevent stroke scaling when zooming
             layer.add(mark);
             continue;
         }
-        
+
         let mark = new Konva.Circle({
             x: tX,  // X position
             y: tY,  // Y position
-            radius: r,  
+            radius: r,
             fill: 'black',  // Fill color
             strokeWidth: 1,  // Stroke thickness\
             snapPoints: [
@@ -564,9 +577,9 @@ function drawNumertaions() {
         let angle = dataLine[4];
         let height = dataLine[5];
         let text = dataLine[7];
-    
+
         [tX, tY] = transformCoordinates(view, dataLine[1], dataLine[3], canvasWidth, canvasHeight);
-    
+
         const numeration = new Konva.Text({
             x: tX,
             y: tY,
@@ -605,7 +618,12 @@ function calcArcAngle(start, end, isClockwise) {
     }
 }
 
-function calcAngle(pX, pY, cX, cY){
+function resolveArcDirection(rawRadius) {
+    // rawRadius > 0 represents clockwise based on fallback calibration
+    return rawRadius > 0;
+}
+
+function calcAngle(pX, pY, cX, cY) {
     let angle = Math.atan2(pY - cY, pX - cX) * (180 / Math.PI); // Negate y for mathematical orientation
     return angle < 0 ? angle + 360 : angle; // Convert negative angles to 0-360 range
 }
@@ -614,8 +632,8 @@ function calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool, view) {
     let [mX, mY] = [(sX + eX) / 2, (sY + eY) / 2]; //Center of start and end points
     let l = Math.sqrt(((sX - eX) ** 2) + ((sY - eY) ** 2)); //Distance between start and end points
     //Calculate the two possible centers
-    let [solX1, solY1] = [mX + Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY + Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
-    let [solX2, solY2] = [mX - Math.sqrt(r ** 2 - (l/2) ** 2) * (sY - eY) / l, mY - Math.sqrt(r ** 2 - (l/2) ** 2) * (eX - sX) / l];
+    let [solX1, solY1] = [mX + Math.sqrt(r ** 2 - (l / 2) ** 2) * (sY - eY) / l, mY + Math.sqrt(r ** 2 - (l / 2) ** 2) * (eX - sX) / l];
+    let [solX2, solY2] = [mX - Math.sqrt(r ** 2 - (l / 2) ** 2) * (sY - eY) / l, mY - Math.sqrt(r ** 2 - (l / 2) ** 2) * (eX - sX) / l];
 
     //Calculate the orientation of first solution and return the correct center based on this orientation
     const sol1Orientation = transformOrientation(view, getArcOrientation(sX, sY, solX1, solY1, eX, eY));
@@ -627,13 +645,13 @@ function calcCenter(sX, sY, cX, cY, eX, eY, r, isClockwise, notchTool, view) {
         if (notchTool.toLowerCase() == 'w') return [solX1, solY1];
         return [solX2, solY2];
     }
-}       
+}
 
 //Function to apply clockwise transformations based on view
 function transformOrientation(view, isClockwise) {
     switch (view) {
         case 'v-view':
-        case 'u-view': 
+        case 'u-view':
             return !isClockwise;
         case 'o-view':
         case 'h-view':
@@ -649,15 +667,15 @@ function getArcOrientation(startX, startY, centerX, centerY, endX, endY) {
     let startVectorY = startY - centerY;
     let endVectorX = endX - centerX;
     let endVectorY = endY - centerY;
-    
+
     //Calculate cross product
     let crossProduct = startVectorX * endVectorY - startVectorY * endVectorX;
-    
+
     return crossProduct > 0 ? 0 : 1; //Positive counterclockwise, negative clockwise
 }
 
 //Draws blocs to the canves
-function drawBlocs(){
+function drawBlocs() {
     clearAllViews();
     drawContours();
     drawHoles();
@@ -665,41 +683,58 @@ function drawBlocs(){
     drawNumertaions();
     addOriginPoints();
     redrawMeasurements();
+    if (typeof draw3DModel === 'function') draw3DModel();
     resetScale(); //Eesets scale and position of the view
     stages[Object.keys(stages)[0]].to({ onFinish: () => autoFitAllViews() }); //Ensures all views scale are reset before auto fit is executed
 }
 
 //Shows or hide views
 function switchView(view, btn) {
-    let viewTitle = document.getElementById(view + 'ViewTitle');
-    let viewContainer = document.getElementById(view + '-view');
+    let viewTitle = document.getElementById(view + 'ViewTitle') || (view === 'threeD' ? document.getElementById('threeDViewTitle') : null);
+    let viewContainer = (view === 'threeD' || view === '3d')
+        ? (document.getElementById('threeDViewerContainer') || document.getElementById('3d-view'))
+        : document.getElementById(view + '-view');
+
+    if (!viewContainer) return;
 
     //Toggle visibility
     let isVisible = !viewContainer.classList.contains('hide');
     if (isVisible) {
-        viewTitle.classList.add('hide');
+        if (viewTitle) viewTitle.classList.add('hide');
         viewContainer.classList.add('hide');
         btn.dataset.tooltip = 'Turn ON'; //Change tooltip to "Turn ON"
         btn.classList.add('text-lighten-3'); //Dim button
     } else {
-        viewTitle.classList.remove('hide');
+        if (viewTitle) viewTitle.classList.remove('hide');
         viewContainer.classList.remove('hide');
         btn.dataset.tooltip = 'Turn OFF'; //Change tooltip to "Turn OFF"
         btn.classList.remove('text-lighten-3'); //Restore button color
+        if (view === 'threeD' || view === '3d') {
+            if (typeof onResize === 'function') onResize();
+            if (typeof render3D === 'function') render3D();
+        }
     }
 
-    M.Tooltip.getInstance(btn).close(); //Close tooltip
-    M.Tooltip.init(document.querySelectorAll('.tooltipped')); //Reinitialize tooltips
+    if (typeof M !== 'undefined' && M.Tooltip) {
+        try { M.Tooltip.getInstance(btn)?.close(); } catch(e){}
+        M.Tooltip.init(document.querySelectorAll('.tooltipped')); //Reinitialize tooltips
+    }
 
-    for (const view of views) handleResize(view);
-    resetScale(); //Reset scale and position of the view
-    stages[Object.keys(stages)[0]].to({ onFinish: () => autoFitAllViews() }); //Ensures all views scale are reset before auto fit is executed
+    if (typeof views !== 'undefined' && views.length) {
+        for (const v of views) {
+            if (typeof handleResize === 'function') handleResize(v);
+        }
+    }
+    if (typeof resetScale === 'function') resetScale(); //Reset scale and position of the view
+    if (typeof stages !== 'undefined' && Object.keys(stages).length && stages[Object.keys(stages)[0]]) {
+        stages[Object.keys(stages)[0]].to({ onFinish: () => autoFitAllViews() }); //Ensures all views scale are reset before auto fit is executed
+    }
 }
 
 //Create a snap indicator point in a view at x, y
 let snapSize = localStorage.getItem("snapSize") || 2;
 let snapPointColor = localStorage.getItem("snapPointColor") || '#FF0000';
-function addSnapIndicator(x, y, view, color=snapPointColor, name='snap-indicator') {
+function addSnapIndicator(x, y, view, color = snapPointColor, name = 'snap-indicator') {
     let snapLayer = snapLayers[view]; //Use snap layer for the active view
 
     let indicator = new Konva.Circle({
@@ -719,8 +754,8 @@ function addSnapIndicator(x, y, view, color=snapPointColor, name='snap-indicator
 
 //Adds origin points to each view
 let originPointColor = localStorage.getItem("originPointColor") || '#008000';
-function addOriginPoints(){
-    for(view of views) {
+function addOriginPoints() {
+    for (view of views) {
         let layer = layers[view];
         let stage = layer.getStage();
         let canvasWidth = stage.width();

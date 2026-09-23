@@ -42,7 +42,7 @@ async function handleFiles(files) {
                  M.toast({ html: 'Conversion Failed!', classes: 'rounded toast-error', displayLength: 3000});
             }
             if (result) {
-                addFile(fileName.replace(/\.dxf$/, ".nc1"), result, fileCount);
+                addFile(fileName.replace(/\.dxf$/, ".nc1"), result, fileCount, false, true);
             }
             continue;
         }
@@ -74,7 +74,7 @@ async function handleFiles(files) {
                     M.toast({ html: 'Conversion Failed!', classes: 'rounded toast-error', displayLength: 3000});
                 }
                 if (result) {
-                    addFile(fileName.replace(/\.dxf$/, ".nc1"), result, fileCount);
+                    addFile(fileName.replace(/\.dxf$/, ".nc1"), result, fileCount, false, true);
                 }
             } 
             finally {
@@ -108,8 +108,11 @@ async function handleFiles(files) {
     }
 
     // Nc file just add to view
-    addFile(fileName, fileData, fileCount);
+    addFile(fileName, fileData, fileCount, false, true);
     }
+
+    if (typeof refreshGrouping === 'function') refreshGrouping();
+    updateSessionData();
 }
 
 // Counter to track drag enter/leave events
@@ -404,10 +407,11 @@ document.addEventListener('keydown', function (e) {
         document.getElementById('saveSettings').click();
     } 
     //Switching views
-    else if(e.key.toLowerCase() === 'o') document.querySelector(`.viewSwitch[data-view="o"]`).click();
-    else if(e.key.toLowerCase() === 'v') document.querySelector(`.viewSwitch[data-view="v"]`).click();
-    else if(e.key.toLowerCase() === 'u') document.querySelector(`.viewSwitch[data-view="u"]`).click();
-    else if(e.key.toLowerCase() === 'h') document.querySelector(`.viewSwitch[data-view="h"]`).click();
+    else if(e.key.toLowerCase() === 'o') document.querySelector(`.viewSwitch[data-view="o"]`)?.click();
+    else if(e.key.toLowerCase() === 'v') document.querySelector(`.viewSwitch[data-view="v"]`)?.click();
+    else if(e.key.toLowerCase() === 'u') document.querySelector(`.viewSwitch[data-view="u"]`)?.click();
+    else if(e.key.toLowerCase() === 'h') document.querySelector(`.viewSwitch[data-view="h"]`)?.click();
+    else if(e.key === '3') document.querySelector(`.viewSwitch[data-view="threeD"]`)?.click();
 });
 
 function loadProfilesPage(){
@@ -424,7 +428,8 @@ function loadNestingPage(){
 
 document.addEventListener('DOMContentLoaded', function(){
     if (filePairs != {}) {
-        for (let [fileName, fileData] of filePairs) addFile(fileName, fileData, filePairs.size, true); //Load saved files in session
+        for (let [fileName, fileData] of filePairs) addFile(fileName, fileData, filePairs.size, true, true); //Load saved files in session
+        if (typeof refreshGrouping === 'function') refreshGrouping();
     }
     if (selectedFile != '') {
         selectedFile = sessionStorage.getItem('selectedFile');
